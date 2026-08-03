@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Wend Solver</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-width: 340px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0e0f0;
+    }
+
+    /* HEADER */
+    .header {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      padding: 11px 16px;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid #2a2a4a;
+    }
+    .header h1 { font-size: 15px; font-weight: 700; color: #a78bfa; }
+    #readyPill {
+      margin-left: auto; font-size: 10px; font-weight: 600;
+      padding: 2px 9px; border-radius: 20px;
+      background: #f8717122; color: #f87171; border: 1px solid #f8717144;
+      transition: all 0.4s;
+    }
+    #readyPill.ready { background: #4ade8022; color: #4ade80; border-color: #4ade8044; }
+
+    /* CAPTURE BUTTON */
+    .capture-wrap { padding: 12px 14px 0; }
+    #captureBtn {
+      width: 100%; padding: 11px;
+      background: linear-gradient(135deg, #7c3aed, #a78bfa);
+      border: none; border-radius: 9px;
+      color: white; font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+    }
+    #captureBtn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px #a78bfa44; }
+    #captureBtn:active { transform: translateY(0); }
+
+    /* GRID AREA */
+    .grid-top-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px 6px;
+    }
+    .grid-label { font-size: 10px; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+    .grid-hint { font-size: 10px; color: #444; }
+    #gridSizeSelect {
+      background: #1a1a30; color: #888; border: 1px solid #2a2a4a;
+      border-radius: 6px; padding: 3px 7px; font-size: 11px; cursor: pointer;
+    }
+
+    .grid-wrap { padding: 0 14px 10px; display: flex; justify-content: center; }
+
+    .grid-container {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      aspect-ratio: 1 / 1;
+    }
+
+    #gridEl {
+      display: grid;
+      gap: 5px;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* THE INPUT CELLS */
+    .cell {
+      width: 100%; height: 100%;
+      border: 2px solid #3a3a5a;
+      border-radius: 9px;
+      background: #1a1a30;
+      color: #e0e0f0;
+      font-size: clamp(14px, 4vw, 22px); font-weight: 800;
+      text-align: center;
+      text-transform: uppercase;
+      caret-color: transparent;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      /* no outline or weird browser styles */
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .cell:focus {
+      border-color: #a78bfa;
+      background: #1e1640;
+      box-shadow: 0 0 0 3px #a78bfa22;
+    }
+    .cell.blocked {
+      background: #1a1a1a;
+      border-color: #222;
+      color: transparent;
+      cursor: pointer;
+      background-image: radial-gradient(circle, #333 4px, transparent 4px);
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    .cell.blocked:focus { box-shadow: none; border-color: #333; }
+
+    /* CONTROLS */
+    .btn-row { display: flex; gap: 8px; padding: 0 14px 12px; }
+    .btn-solve {
+      flex: 2; padding: 12px;
+      background: linear-gradient(135deg, #7c3aed, #a78bfa);
+      border: none; border-radius: 9px;
+      color: white; font-size: 14px; font-weight: 800;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-solve:hover { transform: translateY(-1px); box-shadow: 0 6px 20px #a78bfa44; }
+    .btn-solve:active { transform: translateY(0); }
+    .btn-clear {
+      flex: 1; padding: 12px;
+      background: #1a1a30; border: 1px solid #3a3a5a;
+      border-radius: 9px; color: #666; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-clear:hover { color: #a78bfa; border-color: #a78bfa44; }
+
+    /* STATUS */
+    #statusBar {
+      margin: 0 14px 10px;
+      padding: 10px 12px;
+      border-radius: 8px; font-size: 12px; line-height: 1.6;
+      display: none; white-space: pre-line;
+    }
+    #statusBar.loading {
+      display: flex; align-items: center; gap: 8px;
+      background: #1a1a30; color: #a78bfa; border: 1px solid #a78bfa22;
+    }
+    #statusBar.error {
+      display: block; background: #2a1a1a; color: #f87171; border: 1px solid #f8717122;
+    }
+    .spinner {
+      width: 14px; height: 14px; flex-shrink: 0;
+      border: 2px solid #a78bfa33; border-top-color: #a78bfa;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* RESULTS */
+    #resultsPanel { padding: 0 14px 14px; display: none; }
+    .results-meta { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+    .results-title { font-size: 13px; font-weight: 700; color: #a78bfa; }
+    .results-count { font-size: 11px; color: #555; }
+    #resultsScroll { max-height: 260px; overflow-y: auto; }
+    #resultsScroll::-webkit-scrollbar { width: 3px; }
+    #resultsScroll::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 2px; }
+    .length-group { margin-bottom: 10px; }
+    .length-label { font-size: 9px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 5px; }
+    .words-wrap { display: flex; flex-wrap: wrap; gap: 4px; }
+    .word-chip {
+      background: #1a1a30; border: 1px solid #3a3a5a;
+      border-radius: 20px; padding: 4px 11px;
+      font-size: 12px; font-weight: 700; color: #c4b5fd;
+      cursor: pointer; transition: all 0.12s;
+      text-transform: uppercase; letter-spacing: 0.8px;
+    }
+    .word-chip:hover { background: #221a3a; border-color: #a78bfa; transform: scale(1.06); }
+    .word-chip:active { transform: scale(0.96); }
+
+    /* SECONDARY BUTTONS */
+    .sec-row {
+      display: flex; gap: 6px; padding: 8px 14px 14px;
+      border-top: 1px solid #1a1a2a;
+    }
+    .sec-btn {
+      flex: 1; padding: 8px 4px;
+      background: #1a1a30; border: 1px solid #2a2a4a;
+      border-radius: 8px; color: #555; font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s; text-align: center;
+    }
+    .sec-btn:hover { color: #a78bfa; border-color: #a78bfa44; }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: 14px; left: 50%;
+      transform: translateX(-50%) translateY(30px);
+      background: #a78bfa; color: white;
+      padding: 6px 16px; border-radius: 20px;
+      font-size: 11px; font-weight: 700;
+      opacity: 0; transition: all 0.25s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    #fileInput { display: none; }
+
+    /* MODE TABS */
+    .mode-tabs {
+      display: flex; gap: 0;
+      margin: 10px 14px 0;
+      background: #12122a; border: 1px solid #2a2a4a;
+      border-radius: 10px; overflow: hidden;
+    }
+    .mode-tab {
+      flex: 1; padding: 9px 2px;
+      background: none; border: none;
+      color: #555; font-size: 12px; font-weight: 700;
+      cursor: pointer; transition: all 0.18s;
+      letter-spacing: 0.5px;
+    }
+    .mode-tab.active {
+      background: linear-gradient(135deg, #2d1b69, #a78bfa);
+      color: white;
+    }
+    .mode-tab:not(.active):hover { color: #a78bfa; }
+
+    /* SUDOKU GRID */
+    #sudokuSection { padding: 10px 14px 0; }
+    .sudoku-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .sudoku-top-row select { background: #1a1a30; color: #c4b5fd; border: 1px solid #3a3a5a; border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+    
+    .sudoku-grid {
+      display: grid;
+      border: 3px solid #a78bfa;
+      border-radius: 6px;
+      overflow: hidden;
+      width: 100%;
+      max-width: 340px;
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+    }
+    .sudoku-grid.s6x6 { grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(6, 1fr); }
+    .sudoku-grid.s9x9 { grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr); }
+    .s-cell {
+      width: 100%; height: 100%;
+      border: 1px solid #2a2a4a;
+      background: #1a1a30;
+      color: #e0e0f0;
+      font-size: clamp(16px, 4vw, 24px);
+      font-weight: 700;
+      text-align: center;
+      outline: none;
+      caret-color: transparent;
+      transition: background 0.12s;
+    }
+    .s-cell:focus { background: #1e1640; border-color: #a78bfa; }
+    /* Thick borders for box boundaries (handled in JS now for dynamic sizes) */
+    .s-cell.bb { border-bottom: 2px solid #a78bfa88; }
+    .s-cell.br { border-right:  2px solid #a78bfa88; }
+    .s-cell.given { color: #c4b5fd; background: #16103a; }
+    .s-cell.solved { color: #4ade80; }
+    .s-cell.conflict { background: #2a1515 !important; color: #f87171 !important; }
+    .sudoku-hint { font-size: 10px; color: #444; text-align: center; margin-top: 6px; margin-bottom: 6px; }
+    .btn-sudoku-solve {
+      width: 100%; padding: 12px; margin-top: 8px;
+      background: linear-gradient(135deg, #0e7490, #38bdf8);
+      border: none; border-radius: 9px;
+      color: white; font-size: 14px; font-weight: 800;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-sudoku-solve:hover { transform: translateY(-1px); box-shadow: 0 6px 20px #38bdf844; }
+    .btn-sudoku-solve:active { transform: translateY(0); }
+
+    /* ZIP MODE */
+    .btn-zip {
+      width: 100%; padding: 11px;
+      background: linear-gradient(135deg, #059669, #10b981);
+      border: none; border-radius: 9px;
+      color: white; font-size: 13px; font-weight: 800;
+      cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px;
+    }
+    .btn-zip:hover { transform: translateY(-1px); box-shadow: 0 6px 20px #10b98155; }
+    .btn-zip:active { transform: translateY(0); }
+
+    /* WEND MODE */
+    .wend-section {
+      margin: 0 14px 10px;
+      background: #12122a;
+      border: 1px solid #2a2a4a;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .wend-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .wend-header:hover { background: #1a1a38; }
+    .wend-badge {
+      font-size: 9px; font-weight: 800; color: #a78bfa;
+      text-transform: uppercase; letter-spacing: 1.2px;
+      background: #a78bfa22; border: 1px solid #a78bfa44;
+      padding: 2px 7px; border-radius: 10px;
+    }
+    .wend-header-label { font-size: 12px; color: #888; flex: 1; }
+    .wend-chevron { font-size: 10px; color: #555; transition: transform 0.2s; }
+    .wend-chevron.open { transform: rotate(180deg); }
+    .wend-body {
+      padding: 10px 12px 12px;
+      border-top: 1px solid #1e1e3a;
+      display: none;
+    }
+    .wend-body.open { display: block; }
+    .wend-hint { font-size: 10px; color: #555; margin-bottom: 10px; line-height: 1.5; }
+    .wend-count-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .wend-count-row label { font-size: 11px; color: #777; }
+    .wend-count-row select {
+      background: #1a1a30; color: #c4b5fd; border: 1px solid #3a3a5a;
+      border-radius: 6px; padding: 4px 8px; font-size: 12px;
+    }
+    .wend-lengths { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .wend-len-group { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .wend-len-label { font-size: 9px; color: #555; }
+    .wend-len-input {
+      width: 44px; height: 36px;
+      background: #1a1a30; color: #e0e0f0;
+      border: 1px solid #3a3a5a; border-radius: 7px;
+      font-size: 16px; font-weight: 700; text-align: center;
+    }
+    .wend-len-input:focus { outline: none; border-color: #a78bfa; background: #1e1640; }
+    .btn-wend {
+      width: 100%; padding: 11px;
+      background: linear-gradient(135deg, #2d1b69, #a78bfa);
+      border: none; border-radius: 9px;
+      color: white; font-size: 13px; font-weight: 800;
+      cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px;
+    }
+    .btn-wend:hover { transform: translateY(-1px); box-shadow: 0 6px 20px #a78bfa55; }
+    .btn-wend:active { transform: translateY(0); }
+
+    /* RESULT PATHS */
+    .solution-block {
+      background: #12122a; border: 1px solid #2a2a4a;
+      border-radius: 9px; padding: 10px 12px; margin-bottom: 8px;
+    }
+    .solution-label { font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .solution-words { display: flex; flex-wrap: wrap; gap: 5px; }
+    .solution-word {
+      padding: 5px 12px;
+      border-radius: 20px; font-size: 13px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 1px; cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .solution-word:hover { transform: scale(1.06); }
+    .solution-word:active { transform: scale(0.96); }
+    .color-0 { background: #7c3aed33; border: 1px solid #7c3aed; color: #c4b5fd; }
+    .color-1 { background: #059669aa; border: 1px solid #10b981; color: #6ee7b7; }
+    .color-2 { background: #d9770633; border: 1px solid #f59e0b; color: #fcd34d; }
+    .color-3 { background: #dc262633; border: 1px solid #f87171; color: #fca5a5; }
+    .color-4 { background: #0284c733; border: 1px solid #38bdf8; color: #7dd3fc; }
+    .color-5 { background: #be185d33; border: 1px solid #f43f5e; color: #fda4af; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <span>🎯</span>
+    <h1>Wend Solver</h1>
+    <span id="readyPill">Loading OCR...</span>
+  </div>
+
+
+  <!-- MODE TABS -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tabWend">🎯 Wend</button>
+    <button class="mode-tab" id="tabSudoku">🔢 Sudoku</button>
+    <button class="mode-tab" id="tabZip">🔀 Zip</button>
+  </div>
+
+  <!-- CAPTURE (works for both modes) -->
+  <div class="capture-wrap">
+    <button id="captureBtn">📸 &nbsp;Crop &amp; Solve</button>
+  </div>
+
+  <!-- SHARED GRID SECTION (Wend & Zip) -->
+  <div id="sharedGridSection">
+
+  <!-- MANUAL GRID -->
+  <div class="grid-top-row">
+    <div>
+      <div class="grid-label">Manual Entry</div>
+      <div class="grid-hint">Dbl-click any cell to block it</div>
+    </div>
+    <select id="gridSizeSelect">
+      <option value="4">4&times;4</option>
+      <option value="5" selected>5&times;5</option>
+      <option value="6">6&times;6</option>
+      <option value="7">7&times;7</option>
+      <option value="8">8&times;8</option>
+      <option value="9">9&times;9</option>
+      <option value="10">10&times;10</option>
+    </select>
+  </div>
+
+  <div class="grid-wrap">
+    <div class="grid-container">
+      <div id="gridEl"></div>
+      <svg id="pathOverlay" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10;"></svg>
+    </div>
+  </div>
+
+  </div>
+  <!-- END SHARED GRID SECTION -->
+
+  <!-- WEND SECTION -->
+  <div id="wendSection">
+    <div class="wend-section">
+      <div class="wend-header" id="wendHeader">
+      <span class="wend-badge">Wend</span>
+      <span class="wend-header-label">Set word lengths for exact solve</span>
+      <span class="wend-chevron" id="wendChevron">▼</span>
+    </div>
+    <div class="wend-body" id="wendBody">
+      <div class="wend-hint">
+        Enter the number of words and each word's letter count (shown in the puzzle).
+        The solver will find words that cover <strong>every cell</strong> exactly once.
+      </div>
+      <div class="wend-count-row">
+        <label>Number of words:</label>
+        <select id="wendWordCount">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+          <option value="11">11</option>
+          <option value="12">12</option>
+          <option value="13">13</option>
+          <option value="14">14</option>
+          <option value="15">15</option>
+        </select>
+      </div>
+      <div class="wend-lengths" id="wendLengths"></div>
+      <button class="btn-wend" id="wendSolveBtn">&#127919; Solve Wend (Exact)</button>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-solve" id="solveBtn">&#9889; Free Solve</button>
+    <button class="btn-clear" id="clearBtn">Clear</button>
+  </div>
+
+  </div>
+  <!-- END WEND SECTION -->
+
+  <!-- ZIP SECTION (hidden by default) -->
+  <div id="zipSection" style="display:none">
+    <div class="wend-section">
+      <div class="wend-body" style="display:block; border-top:none;">
+        <div class="wend-hint" style="margin-bottom:10px;">
+          Enter numbers (1, 2, 3...) in the grid.
+          The solver will find a path connecting 1 to the highest number, filling every cell exactly once.
+        </div>
+        <button class="btn-zip" id="zipSolveBtn">🔀 Solve Zip</button>
+      </div>
+    </div>
+    
+    <div class="btn-row">
+      <button class="btn-clear" id="zipClearBtn">Clear</button>
+    </div>
+  </div>
+  <!-- END ZIP SECTION -->
+
+  <!-- SUDOKU SECTION (hidden by default) -->
+  <div id="sudokuSection" style="display:none">
+    <div class="sudoku-top-row">
+      <div class="grid-label" style="font-size:12px;color:#888;">Manual Entry</div>
+      <select id="sudokuSizeSelect">
+        <option value="6" selected>6&times;6 (Mini)</option>
+        <option value="9">9&times;9 (Standard)</option>
+      </select>
+    </div>
+    <div class="sudoku-grid s6x6" id="sudokuGrid"></div>
+    <div class="sudoku-hint">Purple = given &nbsp;|&nbsp; Green = solved &nbsp;|&nbsp; Dbl-click to clear a cell</div>
+    <div style="display:flex;gap:8px;padding:0 0 10px">
+      <button class="btn-sudoku-solve" id="sudokuSolveBtn">&#9889; Solve Sudoku</button>
+      <button class="btn-clear" style="flex:none;padding:12px 16px" id="sudokuClearBtn">Clear</button>
+    </div>
+  </div>
+  <!-- END SUDOKU SECTION -->
+
+  <div id="statusBar"></div>
+  <div id="resultsPanel">
+    <div class="results-meta">
+      <span class="results-title">Solutions</span>
+      <span class="results-count" id="resultsCount"></span>
+    </div>
+    <div id="resultsScroll"></div>
+  </div>
+
+  <!-- SECONDARY -->
+  <div class="sec-row">
+    <button class="sec-btn" id="uploadBtn">&#128193; Upload Image</button>
+    <button class="sec-btn" id="pasteBtn">&#128203; Paste Image</button>
+  </div>
+
+  <div class="toast" id="toast">Copied!</div>
+  <input type="file" id="fileInput" accept="image/*">
+
+  <script src="tesseract/tesseract.min.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
