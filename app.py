@@ -28,8 +28,11 @@ CORS(app)  # Allow cross-origin requests (useful if you ever split frontend/back
 
 @app.route('/')
 def index():
-    """Serve the PWA index."""
-    return send_from_directory(STATIC_DIR, 'index.html')
+    """Serve the PWA index — always fresh so SW updates propagate."""
+    response = send_from_directory(STATIC_DIR, 'index.html')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 @app.route('/sw.js')

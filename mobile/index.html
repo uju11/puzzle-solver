@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#7c3aed">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Wend Solver">
@@ -15,6 +17,58 @@
   <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap">
+
+  <!-- EARLY GLOBALS: defined before any user interaction can fire -->
+  <script>
+  function handleFileSelect(input) {
+    var file = input && input.files && input.files[0];
+    if (!file) return;
+    showImageFile(file);
+  }
+  function showImageFile(file) {
+    // Show preview immediately with blob URL
+    var blobUrl = URL.createObjectURL(file);
+    var img = document.getElementById('screenshotPreview');
+    var previewSec = document.getElementById('previewSection');
+    var howCard = document.getElementById('howCard');
+    if (!img || !previewSec) { console.error('Preview elements not found'); return; }
+    img.src = blobUrl;
+    previewSec.style.setProperty('display', 'block', 'important');
+    previewSec.removeAttribute('hidden');
+    if (howCard) howCard.style.display = 'none';
+    var ocrProg = document.getElementById('ocrProgress');
+    if (ocrProg) ocrProg.textContent = 'Converting image…';
+    var ocrBar = document.getElementById('ocrProgressBar');
+    if (ocrBar) ocrBar.style.display = 'none';
+    var ocrFill = document.getElementById('ocrProgressFill');
+    if (ocrFill) ocrFill.style.width = '0%';
+    console.log('[showImageFile] preview shown for', file.name);
+
+    // Show the grid immediately so user can type letters without waiting for OCR
+    // showGridSection and renderGrid are defined in the main script
+    // (user interaction always happens AFTER the main script has run)
+    if (typeof showGridSection === 'function') showGridSection();
+    if (typeof renderGrid === 'function') renderGrid();
+
+    setTimeout(function() { previewSec.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 150);
+
+    // Convert to data URL — required for canvas/OCR pixel analysis
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      window._currentImageDataUrl = e.target.result;
+      // currentImageDataUrl is declared with 'let' in the main script — set it directly
+      try { currentImageDataUrl = e.target.result; } catch(ex) {}
+      if (ocrProg) ocrProg.textContent = 'Grid ready — type letters, or click "Read Puzzle" to auto-fill';
+      console.log('[showImageFile] data URL ready, length:', e.target.result.length);
+    };
+    reader.onerror = function() {
+      try { currentImageDataUrl = blobUrl; } catch(ex) {}
+      if (ocrProg) ocrProg.textContent = 'Type letters in the grid manually';
+    };
+    reader.readAsDataURL(file);
+  }
+  </script>
+
 
   <style>
     :root {
@@ -87,6 +141,7 @@
 
     /* ── UPLOAD ZONE ── */
     .upload-zone {
+      display: block;           /* label must be block, not inline */
       background: var(--surface);
       border: 2px dashed var(--border);
       border-radius: 18px;
@@ -96,6 +151,8 @@
       transition: all 0.25s;
       position: relative;
       overflow: hidden;
+      width: 100%;              /* fill the section wrapper */
+      box-sizing: border-box;
     }
     .upload-zone::before {
       content: '';
@@ -112,12 +169,19 @@
     .upload-title {
       font-size: 16px; font-weight: 700; color: var(--purple-light); margin-bottom: 6px;
     }
-    .upload-sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .upload-sub { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
+    .upload-browse-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--purple); color: white; border: none;
+      padding: 9px 22px; border-radius: 20px;
+      font-size: 13px; font-weight: 700; font-family: inherit;
+      cursor: pointer; transition: opacity 0.2s;
+      pointer-events: auto;
+    }
+    .upload-zone:hover .upload-browse-btn { opacity: 0.85; }
     .upload-hint {
-      display: inline-block; margin-top: 14px;
-      font-size: 11px; font-weight: 700; color: var(--purple);
-      background: var(--purple-glow); border: 1px solid rgba(124,58,237,0.3);
-      padding: 5px 14px; border-radius: 20px;
+      display: block; margin-top: 12px;
+      font-size: 11px; font-weight: 600; color: var(--muted);
     }
     #fileInput { display: none; }
 
@@ -411,6 +475,25 @@
     /* ── SCROLLBAR ── */
     ::-webkit-scrollbar { width: 3px; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── PROCESS LOG ── */
+    .proc-log { margin: 8px 16px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .proc-log-hdr { display: flex; align-items: center; gap: 8px; padding: 9px 14px; cursor: pointer; user-select: none; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .proc-log-hdr:hover { background: var(--surface2); }
+    .proc-log-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--purple); flex-shrink: 0; }
+    .proc-log-dot.pulse { animation: dotpulse 1.2s infinite; }
+    @keyframes dotpulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .proc-log-cnt { font-size: 9px; background: var(--purple-glow); color: var(--purple-light); padding: 1px 7px; border-radius: 10px; border: 1px solid rgba(124,58,237,0.3); }
+    .proc-log-chev { margin-left: auto; transition: transform 0.2s; font-size: 9px; }
+    .proc-log-body { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; }
+    .proc-log-body.open { max-height: 220px; overflow-y: auto; }
+    .proc-entries { padding: 4px 14px 10px; font-family: 'Courier New', monospace; font-size: 10.5px; }
+    .proc-entry { padding: 2px 0; border-bottom: 1px solid rgba(37,37,69,0.5); color: #555; line-height: 1.5; }
+    .proc-entry:last-child { border: none; }
+    .proc-entry.step { color: var(--purple-light); }
+    .proc-entry.ok   { color: var(--green); }
+    .proc-entry.warn { color: var(--amber); }
+    .proc-entry.err  { color: var(--red); }
   </style>
 </head>
 <body>
@@ -435,22 +518,20 @@
 
     <!-- UPLOAD ZONE -->
     <div class="section">
-      <div class="upload-zone" id="uploadZone" role="button" tabindex="0" aria-label="Upload screenshot">
+      <label class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept="image/*" style="display:none"
+          onchange="handleFileSelect(this)">
         <div class="upload-icon">📸</div>
-        <div class="upload-title">Drop your screenshot here</div>
+        <div class="upload-title">Drop or browse your screenshot</div>
         <div class="upload-sub">
-          Take a screenshot of the LinkedIn Wend puzzle,<br>
-          then share it to this app — or tap to browse.
+          Drag &amp; drop, paste, or click below to browse.
         </div>
-        <span class="upload-hint">📤 Share from LinkedIn → Share Image → Wend Solver</span>
-      </div>
-      <input type="file" id="fileInput" accept="image/*" capture="environment">
+        <span class="upload-browse-btn">🖼️ Browse Gallery</span>
+        <span class="upload-hint">📤 Mobile: LinkedIn → Share Image → Wend Solver</span>
+      </label>
     </div>
 
-    <!-- PASTE HINT -->
-    <div class="divider">or paste / share</div>
-
-    <!-- SECONDARY BUTTONS -->
+    <!-- PASTE / CAMERA BUTTONS -->
     <div style="display:flex; gap:8px; padding: 0 16px 16px;">
       <button class="btn-secondary" id="pasteBtn" style="flex:1">📋 Paste Image</button>
       <button class="btn-secondary" id="cameraBtn" style="flex:1">📷 Camera</button>
@@ -467,7 +548,22 @@
         <div id="ocrProgressBar"><div id="ocrProgressFill"></div></div>
         <div class="ocr-bar">
           <span id="ocrProgress">Ready to scan</span>
-          <button class="btn-ocr" id="runOcrBtn">🔍 Read Puzzle</button>
+          <button class="btn-ocr" id="runOcrBtn" onclick="runOCR()">🔍 Read Puzzle</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROCESS LOG -->
+    <div id="procLogWrap" style="display:none;">
+      <div class="proc-log">
+        <div class="proc-log-hdr" id="procLogHdr" onclick="toggleLog()">
+          <span class="proc-log-dot" id="procLogDot"></span>
+          <span>Process Log</span>
+          <span class="proc-log-cnt" id="procLogCnt">0</span>
+          <span class="proc-log-chev" id="procLogChev">&#9660;</span>
+        </div>
+        <div class="proc-log-body" id="procLogBody">
+          <div class="proc-entries" id="procEntries"></div>
         </div>
       </div>
     </div>
@@ -564,6 +660,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="tesseract/tesseract.min.js"></script>
 <script src="solver.js"></script>
 <script>
 // ── STATE ────────────────────────────────────────────────────
@@ -572,7 +669,46 @@ let blocked = new Set();
 let currentImageDataUrl = null;
 let tesseractWorker = null;
 let workerReady = false;
+let ocrFailed = false;
 let deferredInstallPrompt = null;
+let logIsOpen = false;
+
+function log(msg, type) {
+  type = type || 'info';
+  const wrap = document.getElementById('procLogWrap');
+  const entries = document.getElementById('procEntries');
+  const cnt = document.getElementById('procLogCnt');
+  const dot = document.getElementById('procLogDot');
+  if (!entries) return;
+  wrap.style.display = 'block';
+  const el = document.createElement('div');
+  const cls = { step:'step', success:'ok', error:'err', warn:'warn' };
+  el.className = 'proc-entry ' + (cls[type] || '');
+  const icons = { info:String.fromCharCode(183), step:'\u2192', success:'\u2713', warn:'\u26a0', error:'\u2717' };
+  const t = new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  el.textContent = t + '  ' + (icons[type]||'\u00b7') + '  ' + msg;
+  entries.appendChild(el);
+  cnt.textContent = entries.children.length;
+  if (type === 'error' || type === 'step' || entries.children.length === 1) openLog();
+  dot.className = 'proc-log-dot' + (type !== 'success' ? ' pulse' : '');
+  entries.parentElement.scrollTop = entries.scrollHeight;
+}
+function openLog() {
+  if (logIsOpen) return;
+  logIsOpen = true;
+  document.getElementById('procLogBody').classList.add('open');
+  document.getElementById('procLogChev').style.transform = 'rotate(180deg)';
+}
+function toggleLog() {
+  logIsOpen = !logIsOpen;
+  document.getElementById('procLogBody').classList.toggle('open', logIsOpen);
+  document.getElementById('procLogChev').style.transform = logIsOpen ? 'rotate(180deg)' : '';
+}
+function clearLog() {
+  const e = document.getElementById('procEntries'); if (e) e.innerHTML = '';
+  const c = document.getElementById('procLogCnt'); if (c) c.textContent = '0';
+  const d = document.getElementById('procLogDot'); if (d) d.className = 'proc-log-dot';
+}
 
 // ── PWA INSTALL ──────────────────────────────────────────────
 window.addEventListener('beforeinstallprompt', e => {
@@ -603,27 +739,78 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── TESSERACT INIT ───────────────────────────────────────────
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
 async function initOCR() {
+  const pill = document.getElementById('statusPill');
+  const btn = document.getElementById('runOcrBtn');
+  ocrFailed = false; workerReady = false;
+
   try {
-    const pill = document.getElementById('statusPill');
-    pill.textContent = 'Loading OCR…'; pill.className = 'loading';
+    if (pill) { pill.textContent = 'Loading OCR…'; pill.className = 'loading'; }
+    if (btn) { btn.textContent = '⏳ Loading…'; btn.disabled = true; }
+    log('Initializing local Tesseract OCR engine…', 'step');
+
+    if (typeof Tesseract === 'undefined') {
+      await loadScript('tesseract/tesseract.min.js');
+    }
+
     tesseractWorker = await Tesseract.createWorker('eng', 1, {
+      workerPath: 'tesseract/worker.min.js',
+      corePath: 'tesseract/tesseract-core.wasm.js',
+      langPath: 'tesseract',
+      workerBlobURL: false,
       logger: m => {
+        const pct = Math.round((m.progress || 0) * 100);
+        if (m.status === 'loading tesseract core') log('Loading core: ' + pct + '%', 'info');
+        if (m.status === 'loading language traineddata') log('Language data: ' + pct + '%', 'info');
         if (m.status === 'recognizing text') {
-          const pct = Math.round(m.progress * 100);
-          document.getElementById('ocrProgressFill').style.width = pct + '%';
+          const bar = document.getElementById('ocrProgressBar');
+          if (bar) bar.style.display = 'block';
+          const fill = document.getElementById('ocrProgressFill');
+          if (fill) fill.style.width = pct + '%';
         }
       }
     });
     await tesseractWorker.setParameters({
-      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789',
       tessedit_pageseg_mode: '6',
     });
     workerReady = true;
-    pill.textContent = 'Ready'; pill.className = 'ready';
+    if (pill) { pill.textContent = 'Ready'; pill.className = 'ready'; }
+    if (btn) { btn.textContent = '🔍 Read Puzzle'; btn.disabled = false; }
+    log('OCR engine ready (offline bundle loaded)', 'success');
   } catch (e) {
-    console.warn('Tesseract init failed:', e);
-    document.getElementById('statusPill').textContent = 'No OCR';
+    console.warn('Local Tesseract init failed, trying fallback:', e);
+    try {
+      if (typeof Tesseract === 'undefined') {
+        await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+      }
+      tesseractWorker = await Tesseract.createWorker('eng', 1);
+      await tesseractWorker.setParameters({
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789',
+        tessedit_pageseg_mode: '6',
+      });
+      workerReady = true;
+      if (pill) { pill.textContent = 'Ready'; pill.className = 'ready'; }
+      if (btn) { btn.textContent = '🔍 Read Puzzle'; btn.disabled = false; }
+      log('OCR engine ready (remote fallback)', 'success');
+    } catch (e2) {
+      console.warn('Tesseract fallback failed:', e2);
+      ocrFailed = true;
+      if (pill) { pill.textContent = 'No OCR'; pill.className = ''; }
+      if (btn) { btn.textContent = '✏️ Enter Manually'; btn.disabled = false; }
+      const prog = document.getElementById('ocrProgress');
+      if (prog) prog.textContent = 'OCR unavailable — type letters into the grid below';
+      log('OCR init failed — manual mode active', 'warn');
+      showGridSection();
+    }
   }
 }
 initOCR();
@@ -632,49 +819,116 @@ initOCR();
 loadExtendedDictionary();
 
 // ── IMAGE LOADING ────────────────────────────────────────────
+function handleFileSelect(input) {
+  // Inline handler called directly from onchange attribute on <input>
+  var file = input.files && input.files[0];
+  console.log('[handleFileSelect] called, file:', file ? file.name : 'none');
+  if (file) showImageFile(file);
+}
+
+function showImageFile(file) {
+  console.log('[showImageFile] file:', file.name, file.type, file.size);
+
+  // Immediately show a blob URL preview
+  var blobUrl = URL.createObjectURL(file);
+  var img = document.getElementById('screenshotPreview');
+  var previewSec = document.getElementById('previewSection');
+  var howCard = document.getElementById('howCard');
+
+  img.src = blobUrl;
+  previewSec.style.cssText = 'display:block !important; padding:16px 16px 0;';
+  howCard.style.display = 'none';
+  document.getElementById('ocrProgress').textContent = 'Converting image…';
+  document.getElementById('ocrProgressBar').style.display = 'none';
+  document.getElementById('ocrProgressFill').style.width = '0%';
+
+  log('Image loaded: ' + file.name, 'step');
+
+  // Show the grid immediately so user can type letters manually
+  // (OCR via "Read Puzzle" button will auto-fill if it loads)
+  showGridSection();
+
+  setTimeout(() => {
+    previewSec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 100);
+
+  // Convert to base64 data URL — required for canvas/OCR pixel analysis
+  const reader = new FileReader();
+  reader.onload = e => {
+    currentImageDataUrl = e.target.result;
+    window._currentImageDataUrl = currentImageDataUrl;
+    document.getElementById('ocrProgress').textContent =
+      workerReady ? 'Click "Read Puzzle" to auto-fill grid, or type letters manually'
+                  : 'Type letters in the grid manually (or wait for OCR to load)';
+    log('Image ready — type letters in grid or use "Read Puzzle"', 'success');
+  };
+  reader.onerror = err => {
+    log('Failed to convert image: ' + err, 'error');
+    currentImageDataUrl = blobUrl;
+    document.getElementById('ocrProgress').textContent = 'Type letters in the grid manually';
+  };
+  reader.readAsDataURL(file);
+}
+
 function loadImageBlob(blob) {
-  const url = URL.createObjectURL(blob);
-  loadImageUrl(url);
+  // Called from drag-drop and paste paths
+  if (!blob) return;
+  showImageFile(blob instanceof File ? blob : new File([blob], 'image.png', { type: blob.type || 'image/png' }));
 }
 
 function loadImageUrl(dataUrl) {
   currentImageDataUrl = dataUrl;
-  const img = document.getElementById('screenshotPreview');
+  var img = document.getElementById('screenshotPreview');
+  var previewSec = document.getElementById('previewSection');
+  var howCard = document.getElementById('howCard');
   img.src = dataUrl;
-  document.getElementById('previewSection').style.display = 'block';
-  document.getElementById('howCard').style.display = 'none';
+  previewSec.style.cssText = 'display:block !important; padding:16px 16px 0;';
+  howCard.style.display = 'none';
   document.getElementById('ocrProgress').textContent = 'Ready to scan';
   document.getElementById('ocrProgressBar').style.display = 'none';
   document.getElementById('ocrProgressFill').style.width = '0%';
-  img.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // ── FILE INPUT ───────────────────────────────────────────────
-document.getElementById('uploadZone').addEventListener('click', () => {
-  document.getElementById('fileInput').click();
+const fileInputEl = document.getElementById('fileInput');
+const uploadZoneEl = document.getElementById('uploadZone');
+
+// The <label> wrapping the input natively opens the file picker on click.
+// The inline onchange="handleFileSelect(this)" handles the selection.
+// Also attach via addEventListener as backup:
+fileInputEl.addEventListener('change', function() {
+  console.log('[change listener] files:', this.files ? this.files.length : 0);
+  if (this.files && this.files[0]) showImageFile(this.files[0]);
 });
-document.getElementById('uploadZone').addEventListener('keydown', e => {
-  if (e.key === 'Enter' || e.key === ' ') document.getElementById('fileInput').click();
-});
-document.getElementById('fileInput').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (file) loadImageBlob(file);
-});
+
+// Camera button — opens camera directly via capture attribute
 document.getElementById('cameraBtn').addEventListener('click', () => {
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
-  inp.onchange = e => { if (e.target.files[0]) loadImageBlob(e.target.files[0]); };
+  inp.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (file) loadImageBlob(file);
+  };
   inp.click();
 });
 
 // ── DRAG AND DROP ────────────────────────────────────────────
-const uploadZone = document.getElementById('uploadZone');
-uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
-uploadZone.addEventListener('drop', e => {
-  e.preventDefault(); uploadZone.classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
+uploadZoneEl.addEventListener('dragover', e => { e.preventDefault(); uploadZoneEl.classList.add('drag-over'); });
+uploadZoneEl.addEventListener('dragleave', () => uploadZoneEl.classList.remove('drag-over'));
+uploadZoneEl.addEventListener('drop', e => {
+  e.preventDefault(); uploadZoneEl.classList.remove('drag-over');
+  const file = e.dataTransfer.files && e.dataTransfer.files[0];
   if (file && file.type.startsWith('image/')) loadImageBlob(file);
+});
+
+// Allow window-wide drag and drop
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {
+  const file = e.dataTransfer?.files?.[0];
+  if (file && file.type.startsWith('image/')) {
+    e.preventDefault();
+    loadImageBlob(file);
+  }
 });
 
 // ── PASTE ────────────────────────────────────────────────────
@@ -692,7 +946,6 @@ document.getElementById('pasteBtn').addEventListener('click', async () => {
     }
     showToast('No image in clipboard');
   } catch (e) {
-    // Fallback: listen for paste event
     document.addEventListener('paste', handlePaste, { once: true });
     showToast('Paste now (Ctrl/Cmd+V)');
   }
@@ -720,35 +973,76 @@ document.getElementById('runOcrBtn').addEventListener('click', runOCR);
 
 async function runOCR() {
   if (!currentImageDataUrl) { showToast('No image loaded'); return; }
-  if (!workerReady) { showToast('OCR still loading, please wait…'); return; }
+
+  if (ocrFailed) {
+    showGridSection();
+    document.getElementById('gridSection').scrollIntoView({ behavior: 'smooth' });
+    log('Showing manual grid entry (OCR unavailable)', 'warn');
+    showToast('✏️ Click cells to type letters, double-click to toggle wall');
+    return;
+  }
+
+  if (!workerReady) {
+    const btn2 = document.getElementById('runOcrBtn');
+    btn2.disabled = true;
+    btn2.textContent = '⏳ Waiting for OCR…';
+    document.getElementById('ocrProgress').textContent = '⏳ OCR engine loading — will scan automatically when ready…';
+    log('OCR engine still loading — will auto-run when ready…', 'warn');
+    const waitAndRun = setInterval(() => {
+      if (workerReady || ocrFailed) {
+        clearInterval(waitAndRun);
+        btn2.disabled = false;
+        btn2.textContent = '🔍 Read Puzzle';
+        if (!ocrFailed) runOCR();
+        else {
+          showGridSection();
+          document.getElementById('ocrProgress').textContent = '⚠️ OCR failed — enter letters manually';
+        }
+      }
+    }, 500);
+    return;
+  }
 
   const btn = document.getElementById('runOcrBtn');
   btn.disabled = true; btn.textContent = 'Scanning…';
   document.getElementById('ocrProgressBar').style.display = 'block';
   document.getElementById('ocrProgress').textContent = 'Running OCR…';
+  clearLog();
+  log('Starting OCR scan…', 'step');
 
   try {
+    log('Sending image to Tesseract engine…', 'info');
     const { data } = await tesseractWorker.recognize(currentImageDataUrl);
     const symbols = data.symbols || [];
+    log('OCR complete: ' + symbols.length + ' raw characters found', 'success');
 
-    // Build pixel data for brightness sampling (wall detection)
+    log('Sampling pixel brightness for wall detection…', 'step');
     const pxData = await loadImagePixels(currentImageDataUrl);
+
+    log('Building grid from detected characters…', 'step');
     const grid = buildGridFromOCR(symbols, pxData);
 
     if (!grid) {
       document.getElementById('ocrProgress').textContent = '⚠️ Could not detect grid — try cropping to just the puzzle';
+      log('Grid detection failed — crop closer to the puzzle area', 'error');
       showToast('OCR failed — try a closer crop');
     } else {
-      document.getElementById('ocrProgress').textContent = `✅ Grid detected (${grid.length}×${grid[0].length})`;
+      const letters = grid.flat().filter(c => /[A-Z]/.test(c)).length;
+      const walls = grid.flat().filter(c => c === '#').length;
+      document.getElementById('ocrProgress').textContent = '✅ Grid detected (' + grid.length + 'x' + grid[0].length + ')';
+      log('Grid ' + grid.length + 'x' + grid[0].length + ': ' + letters + ' letters, ' + walls + ' walls', 'success');
       applyOCRGrid(grid);
+      log('Grid applied — verify letters, then click Solve below', 'step');
     }
   } catch (e) {
     document.getElementById('ocrProgress').textContent = '❌ Error: ' + e.message;
+    log('OCR error: ' + e.message, 'error');
     console.error(e);
   } finally {
     btn.disabled = false; btn.textContent = '🔍 Read Puzzle';
   }
 }
+
 
 // ── PIXEL HELPERS ────────────────────────────────────────────
 function loadImagePixels(dataUrl) {
@@ -974,11 +1268,15 @@ function toggleBlocked(r, c) {
 }
 
 function showGridSection() {
+  const el = document.getElementById('gridEl');
+  if (!el || !el.children || !el.children.length) renderGrid();
   document.getElementById('gridSection').style.display = 'block';
   document.getElementById('actionRow').style.display = 'flex';
   document.getElementById('wendConfig').style.display = 'block';
   document.getElementById('howCard').style.display = 'none';
-  document.getElementById('gridSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setTimeout(() => {
+    document.getElementById('gridSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 100);
 }
 
 // ── SIZE BUTTONS ─────────────────────────────────────────────
@@ -1038,19 +1336,34 @@ function readGrid() {
 document.getElementById('freeSolveBtn').addEventListener('click', async () => {
   const { grid, hasLetter } = readGrid();
   if (!hasLetter) { setStatus('Enter letters first!', 'error'); return; }
+  clearLog();
+  log('Starting Free Solve…', 'step');
+  const cells = grid.flat().filter(c => c !== '#');
+  log('Grid: ' + grid.length + 'x' + grid[0].length + ', ' + cells.length + ' active cells', 'info');
   setStatus('Solving…', 'loading');
   hideResults();
   clearColors();
 
-  await loadExtendedDictionary();
-  await new Promise(r => setTimeout(r, 0)); // yield to UI
+  log('Loading dictionary…', 'step');
+  await loadExtendedDictionary(msg => log(msg, 'info'));
+  log('Dictionary ready', 'success');
+  await new Promise(r => setTimeout(r, 0));
 
+  log('Running DFS word search (lengths 3-10)…', 'step');
   try {
     const results = solveFree(grid);
     clearStatus();
-    if (results.length > 0) showFreeResults(results);
-    else setStatus('No words found. Check the grid letters.', 'error');
-  } catch (e) { setStatus('Error: ' + e.message, 'error'); }
+    if (results.length > 0) {
+      log('Found ' + results.length + ' words', 'success');
+      showFreeResults(results);
+    } else {
+      log('No words found — check all letters are entered correctly', 'warn');
+      setStatus('No words found. Check the grid letters.', 'error');
+    }
+  } catch (e) {
+    log('Error: ' + e.message, 'error');
+    setStatus('Error: ' + e.message, 'error');
+  }
 });
 
 document.getElementById('wendSolveBtn').addEventListener('click', async () => {
@@ -1061,20 +1374,46 @@ document.getElementById('wendSolveBtn').addEventListener('click', async () => {
     .map(i => parseInt(i.value)).filter(n => n > 0);
   if (!lengths.length) { setStatus('Set word lengths in the Wend config below.', 'error'); return; }
 
+  clearLog();
+  log('Starting Wend Solve…', 'step');
+  const cellCount = grid.flat().filter(c => c !== '#').length;
+  const totalLen = lengths.reduce((a, b) => a + b, 0);
+  log('Grid has ' + cellCount + ' active cells, word lengths sum = ' + totalLen, 'info');
+
+  if (totalLen !== cellCount) {
+    log('Mismatch: lengths sum ' + totalLen + ' does not equal ' + cellCount + ' cells', 'error');
+    setStatus('Word lengths sum to ' + totalLen + ' but grid has ' + cellCount + ' non-wall cells. Adjust lengths or blocked cells.', 'error');
+    return;
+  }
+
+  log('Searching for ' + lengths.length + ' words: [' + lengths.join(', ') + ']', 'step');
   setStatus('Solving (exact Wend)…', 'loading');
   hideResults();
   clearColors();
 
-  await loadExtendedDictionary();
+  log('Loading dictionary…', 'step');
+  await loadExtendedDictionary(msg => log(msg, 'info'));
+  log('Dictionary ready', 'success');
   await new Promise(r => setTimeout(r, 0));
 
+  log('Running exact-cover DFS…', 'step');
   try {
     const result = solveWend(grid, lengths);
     clearStatus();
-    if (result?.error) setStatus(result.error, 'error');
-    else if (!result?.length) setStatus('No exact solution found. Check grid + word lengths.', 'error');
-    else showWendResults(result);
-  } catch (e) { setStatus('Error: ' + e.message, 'error'); }
+    if (result && result.error) {
+      log('Error: ' + result.error, 'error');
+      setStatus(result.error, 'error');
+    } else if (!result || !result.length) {
+      log('No solution found — verify all letters and word lengths are correct', 'warn');
+      setStatus('No exact solution found. Check grid + word lengths.', 'error');
+    } else {
+      log('Found ' + result.length + ' solution(s)', 'success');
+      showWendResults(result);
+    }
+  } catch (e) {
+    log('Error: ' + e.message, 'error');
+    setStatus('Error: ' + e.message, 'error');
+  }
 });
 
 document.getElementById('clearGridBtn').addEventListener('click', () => {
@@ -1254,26 +1593,6 @@ const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('share') === '1') {
   showToast('Share received — loading image…');
 }
-</script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script>
-  // ── SERVICE WORKER REGISTRATION ─────────────────────────────
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js', { scope: '/' })
-        .then(reg => console.log('[SW] Registered, scope:', reg.scope))
-        .catch(err => console.warn('[SW] Registration failed:', err));
-    });
-
-    // Listen for images shared via Share Target
-    navigator.serviceWorker.addEventListener('message', e => {
-      if (e.data?.type === 'SHARED_IMAGE') {
-        const blob = new Blob([e.data.buffer], { type: e.data.mime });
-        const file = new File([blob], 'shared.jpg', { type: e.data.mime });
-        handleImageFile(file);
-      }
-    });
-  }
 </script>
 </body>
 </html>
