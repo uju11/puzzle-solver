@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wend-solver-v20';
+const CACHE_NAME = 'wend-solver-v21';
 
 // Only cache static JS assets — never HTML (so updates always propagate)
 const STATIC_ASSETS = [
