@@ -305,3 +305,169 @@ function solveWend(grid, wordLengths) {
   backtrack(0);
   return solutions;
 }
+
+// ── SUDOKU SOLVER (backtracking) ────────────────────────────
+function solveSudokuBoard(inputBoard, size) {
+  const g = inputBoard.map(row => [...row]);
+  const boxRows = size === 6 ? 2 : 3;
+  const boxCols = 3;
+
+  function isValid(row, col, num) {
+    for (let c = 0; c < size; c++) if (g[row][c] === num) return false;
+    for (let r = 0; r < size; r++) if (g[r][col] === num) return false;
+    const br = Math.floor(row / boxRows) * boxRows;
+    const bc = Math.floor(col / boxCols) * boxCols;
+    for (let r = br; r < br + boxRows; r++)
+      for (let c = bc; c < bc + boxCols; c++)
+        if (g[r][c] === num) return false;
+    return true;
+  }
+
+  function solve() {
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col < size; col++) {
+        if (g[row][col] === 0) {
+          for (let n = 1; n <= size; n++) {
+            if (isValid(row, col, n)) {
+              g[row][col] = n;
+              if (solve()) return true;
+              g[row][col] = 0;
+            }
+          }
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  return solve() ? g : null;
+}
+
+// ── ZIP SOLVER (Hamiltonian Path with BFS pruning) ───────────
+function solveZipGrid(grid, hWalls = new Set(), vWalls = new Set()) {
+  const rows = grid.length;
+  const cols = grid[0].length;
+  
+  let maxNum = 0;
+  let startR = -1, startC = -1;
+  let totalValid = 0;
+  const numPos = {};
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] !== '#') {
+        totalValid++;
+        if (typeof grid[r][c] === 'number') {
+          const n = grid[r][c];
+          numPos[n] = [r, c];
+          if (n > maxNum) maxNum = n;
+          if (n === 1) { startR = r; startC = c; }
+        }
+      }
+    }
+  }
+
+  if (startR === -1 || maxNum < 2) return { error: "Must have at least numbers 1 and 2." };
+  for (let i = 1; i <= maxNum; i++) {
+    if (!numPos[i]) return { error: `Missing number ${i}.` };
+  }
+
+  const visited = Array.from({length: rows}, () => new Array(cols).fill(false));
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] === '#') visited[r][c] = true;
+    }
+  }
+
+  const path = [];
+  const solutions = [];
+
+  function canMove(r, c, nr, nc) {
+    if (nr === r + 1) return !hWalls.has(`${r},${c}`);
+    if (nr === r - 1) return !hWalls.has(`${nr},${c}`);
+    if (nc === c + 1) return !vWalls.has(`${r},${c}`);
+    if (nc === c - 1) return !vWalls.has(`${r},${nc}`);
+    return true;
+  }
+
+  function isConnected(unvisitedCount) {
+    let sr = -1, sc = -1;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (!visited[r][c]) { sr = r; sc = c; break; }
+      }
+      if (sr !== -1) break;
+    }
+    if (sr === -1) return true;
+
+    let count = 0;
+    const q = [[sr, sc]];
+    const seen = Array.from({length: rows}, () => new Array(cols).fill(false));
+    seen[sr][sc] = true;
+
+    let head = 0;
+    while (head < q.length) {
+      const [r, c] = q[head++];
+      count++;
+      for (const [nr, nc] of [[r-1,c], [r+1,c], [r,c-1], [r,c+1]]) {
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !visited[nr][nc] && !seen[nr][nc] && canMove(r, c, nr, nc)) {
+          seen[nr][nc] = true;
+          q.push([nr, nc]);
+        }
+      }
+    }
+    return count === unvisitedCount;
+  }
+
+  function dfs(r, c, currentTarget, unvisitedCount) {
+    if (solutions.length > 0) return;
+
+    visited[r][c] = true;
+    path.push([r, c]);
+    unvisitedCount--;
+
+    const isTarget = (grid[r][c] === currentTarget);
+    const nextTarget = isTarget ? currentTarget + 1 : currentTarget;
+
+    if (unvisitedCount === 0 && currentTarget >= maxNum) {
+      solutions.push([...path]);
+      visited[r][c] = false;
+      path.pop();
+      return;
+    }
+
+    if (unvisitedCount > 0 && !isConnected(unvisitedCount)) {
+      visited[r][c] = false;
+      path.pop();
+      return;
+    }
+
+    if (nextTarget <= maxNum) {
+      const [tr, tc] = numPos[nextTarget];
+      const dist = Math.abs(r - tr) + Math.abs(c - tc);
+      if (dist > unvisitedCount) {
+        visited[r][c] = false;
+        path.pop();
+        return;
+      }
+    }
+
+    for (const [nr, nc] of [[r-1,c], [r+1,c], [r,c-1], [r,c+1]]) {
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !visited[nr][nc] && canMove(r, c, nr, nc)) {
+        const cellVal = grid[nr][nc];
+        if (typeof cellVal === 'number') {
+          if (cellVal === nextTarget) dfs(nr, nc, nextTarget, unvisitedCount);
+        } else {
+          dfs(nr, nc, nextTarget, unvisitedCount);
+        }
+      }
+    }
+
+    visited[r][c] = false;
+    path.pop();
+  }
+
+  dfs(startR, startC, 1, totalValid);
+  return solutions;
+}
