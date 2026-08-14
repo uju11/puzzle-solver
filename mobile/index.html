@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#090d16">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Wend Solver">
-  <meta name="description" content="Solve LinkedIn Wend puzzles instantly — doodle style!">
-  <title>Wend Solver ✏️</title>
+  <meta name="description" content="AI & Algorithmic Solver for LinkedIn Wend, Sudoku, and Zip puzzles — screenshot OCR, instant DFS solutions, and interactive path tracing.">
+  <title>Wend Solver · Puzzle Engine</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Gaegu:wght@400;700&family=Patrick+Hand&family=Space+Grotesk:wght@600;700;800&display=swap">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 
   <!-- EARLY GLOBALS: defined before any user interaction can fire -->
   <script>
@@ -26,16 +26,14 @@
     showImageFile(file);
   }
   function showImageFile(file) {
-    // Show preview immediately with blob URL
     var blobUrl = URL.createObjectURL(file);
     var img = document.getElementById('screenshotPreview');
     var previewSec = document.getElementById('previewSection');
     var howCard = document.getElementById('howCard');
     if (!img || !previewSec) { console.error('Preview elements not found'); return; }
     img.src = blobUrl;
-    previewSec.style.setProperty('display', 'block', 'important');
+    previewSec.style.display = 'block';
     previewSec.removeAttribute('hidden');
-    if (howCard) howCard.style.display = 'none';
     var ocrProg = document.getElementById('ocrProgress');
     if (ocrProg) ocrProg.textContent = 'Converting image…';
     var ocrBar = document.getElementById('ocrProgressBar');
@@ -47,18 +45,16 @@
     if (typeof showGridSection === 'function') showGridSection();
     if (typeof renderGrid === 'function') renderGrid();
 
-    setTimeout(function() { previewSec.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 150);
-
     var reader = new FileReader();
     reader.onload = function(e) {
       window._currentImageDataUrl = e.target.result;
       try { currentImageDataUrl = e.target.result; } catch(ex) {}
-      if (ocrProg) ocrProg.textContent = 'Grid ready — type letters, or tap "Read Puzzle" ✏️';
+      if (ocrProg) ocrProg.textContent = 'Ready — click "Read Puzzle" or type letters below';
       console.log('[showImageFile] data URL ready, length:', e.target.result.length);
     };
     reader.onerror = function() {
       try { currentImageDataUrl = blobUrl; } catch(ex) {}
-      if (ocrProg) ocrProg.textContent = 'Type letters into the grid manually ✏️';
+      if (ocrProg) ocrProg.textContent = 'Type letters into the grid manually';
     };
     reader.readAsDataURL(file);
   }
@@ -66,740 +62,1612 @@
 
   <style>
     :root {
-      --bg: #ffffff;
-      --paper: #fafafa;
-      --ink: #000000;
-      --ink-dim: #333333;
-      --ink-muted: #666666;
-      --border: #000000;
-      --border-w: 2.5px;
-      --shadow: 4px 4px 0px #000000;
-      --shadow-sm: 2px 2px 0px #000000;
-      --shadow-lg: 6px 6px 0px #000000;
-      --radius-box: 14px;
-      --safe-top: env(safe-area-inset-top);
-      --safe-bot: env(safe-area-inset-bottom);
+      --bg-base: #090d16;
+      --bg-surface: rgba(17, 24, 39, 0.7);
+      --bg-surface-elevated: rgba(30, 41, 59, 0.75);
+      --bg-surface-glass: rgba(15, 23, 42, 0.65);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-medium: rgba(255, 255, 255, 0.14);
+      --border-focus: #818cf8;
+      
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-glow: rgba(99, 102, 241, 0.35);
+      
+      --accent-violet: #8b5cf6;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+
+      --cell-bg: rgba(30, 41, 59, 0.65);
+      --cell-border: rgba(255, 255, 255, 0.12);
+      --cell-hover: rgba(51, 65, 85, 0.85);
+
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --radius-xl: 24px;
+      
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+      --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.18);
+      
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bot: env(safe-area-inset-bottom, 0px);
     }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     html, body {
-      height: 100%; width: 100%;
-      font-family: 'Patrick Hand', cursive, sans-serif;
-      font-size: 16px;
-      background-color: var(--bg);
-      background-image: radial-gradient(#d4d4d4 1.5px, transparent 1.5px);
-      background-size: 22px 22px;
-      color: var(--ink);
+      min-height: 100vh;
+      width: 100%;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 15px;
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 35%),
+        radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.05) 0%, transparent 50%),
+        radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 28px 28px;
+      background-attachment: fixed;
+      color: var(--text-primary);
       overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
-      line-height: 1.4;
+      line-height: 1.5;
     }
 
-    /* ── APP SHELL ── */
-    .app {
-      display: flex; flex-direction: column;
-      min-height: 100dvh;
-      max-width: 520px;
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); }
+
+    /* ── APP CONTAINER ── */
+    .app-wrapper {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      width: 100%;
+      max-width: 1560px;
       margin: 0 auto;
-      background: #ffffff;
-      border-left: var(--border-w) solid var(--border);
-      border-right: var(--border-w) solid var(--border);
-      box-shadow: 6px 0 0 rgba(0,0,0,0.04), -6px 0 0 rgba(0,0,0,0.04);
-      padding-top: max(var(--safe-top), 0px);
-      padding-bottom: max(var(--safe-bot), 0px);
+      padding: 0 1.25rem;
     }
 
     /* ── HEADER ── */
     header {
-      position: sticky; top: 0; z-index: 100;
-      background: #ffffff;
-      border-bottom: 3px solid var(--border);
-      box-shadow: 0 4px 0 #000000;
-      padding: 12px 18px;
-      display: flex; align-items: center; gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(9, 13, 22, 0.82);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0.85rem 0.5rem;
+      margin: 0 -0.5rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
     }
-    .logo { font-size: 22px; }
-    header h1 {
-      font-family: 'Gaegu', cursive, sans-serif;
-      font-size: 26px; font-weight: 700;
-      color: var(--ink);
-      letter-spacing: 0.5px;
-      display: flex; align-items: center; gap: 4px;
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
     }
+
+    .brand-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #ffffff;
+      font-size: 20px;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    }
+
+    .brand-text h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .brand-text .subtext {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+
+    /* ── MODE SWITCHER ── */
+    .mode-nav {
+      display: flex;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 3px;
+      gap: 3px;
+    }
+
+    .mode-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.45rem 1rem;
+      border: none;
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .mode-tab:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .mode-tab.active {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(139, 92, 246, 0.9));
+      color: #ffffff;
+      box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
+    }
+
+    /* ── HEADER ACTIONS & STATUS ── */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
     #statusPill {
-      margin-left: auto;
-      font-family: 'Patrick Hand', cursive;
-      font-size: 13px; font-weight: 700;
-      padding: 3px 12px; border-radius: 20px;
-      background: #ffffff; color: var(--ink); border: 2px solid var(--border);
-      box-shadow: var(--shadow-sm);
-      transform: rotate(-1.5deg);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.35rem 0.85rem;
+      border-radius: 99px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
       transition: all 0.2s;
     }
-    #statusPill.ready { background: #000000; color: #ffffff; }
-    #statusPill.loading { background: #f0f0f0; color: var(--ink); }
 
-    /* ── MAIN CONTENT ── */
-    main { flex: 1; overflow-y: auto; padding-bottom: 24px; }
+    #statusPill::before {
+      content: '';
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
 
-    /* ── SECTION WRAPPER ── */
-    .section { padding: 16px 16px 0; }
+    #statusPill.ready {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #34d399;
+    }
+    #statusPill.ready::before {
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    #statusPill.loading {
+      background: rgba(99, 102, 241, 0.12);
+      border-color: rgba(99, 102, 241, 0.3);
+      color: #818cf8;
+    }
+    #statusPill.loading::before {
+      background: #6366f1;
+      box-shadow: 0 0 8px #6366f1;
+      animation: pulse 1s infinite alternate;
+    }
+
+    /* ── MAIN DASHBOARD GRID ── */
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 340px 1fr 340px;
+      gap: 1.25rem;
+      align-items: start;
+      padding-bottom: 2rem;
+    }
+
+    @media (max-width: 1200px) {
+      .dashboard-layout {
+        grid-template-columns: 320px 1fr;
+      }
+      .results-column {
+        grid-column: span 2;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .dashboard-layout {
+        grid-template-columns: 1fr;
+      }
+      .results-column {
+        grid-column: span 1;
+      }
+    }
+
+    /* ── PANEL / CARD STYLES ── */
+    .glass-card {
+      background: var(--bg-surface);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .glass-card:hover {
+      border-color: var(--border-medium);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      padding-bottom: 0.65rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      letter-spacing: -0.01em;
+    }
+
+    .card-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.25);
+    }
+
+    /* ── LEFT COLUMN: INPUTS & OCR ── */
+    .left-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
 
     /* ── UPLOAD ZONE ── */
     .upload-zone {
-      display: block;
-      background: #ffffff;
-      border: 3px dashed var(--border);
-      border-radius: var(--radius-box);
-      box-shadow: var(--shadow);
-      padding: 26px 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 2px dashed rgba(99, 102, 241, 0.35);
+      border-radius: var(--radius-md);
+      padding: 1.75rem 1rem;
       text-align: center;
       cursor: pointer;
-      transition: all 0.2s;
+      background: rgba(15, 23, 42, 0.45);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
       position: relative;
-      overflow: hidden;
-      width: 100%;
     }
-    .upload-zone:hover, .upload-zone.drag-over {
-      transform: translate(-2px, -2px);
-      box-shadow: var(--shadow-lg);
-      background: #fafafa;
-      border-style: solid;
-    }
-    .upload-zone:active {
-      transform: translate(2px, 2px);
-      box-shadow: var(--shadow-sm);
-    }
-    .upload-icon {
-      font-size: 40px; margin-bottom: 6px;
-    }
-    .upload-title {
-      font-family: 'Gaegu', cursive;
-      font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 4px;
-    }
-    .upload-sub { font-size: 15px; color: var(--ink-muted); line-height: 1.3; margin-bottom: 14px; }
-    .upload-browse-btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: #000000; color: #ffffff; border: 2px solid #000000;
-      padding: 8px 22px; border-radius: 10px;
-      box-shadow: var(--shadow-sm);
-      font-size: 15px; font-weight: 700; font-family: 'Patrick Hand', cursive;
-      cursor: pointer; transition: all 0.15s;
-    }
-    .upload-browse-btn:hover {
-      background: #222222;
-      transform: translate(-1px, -1px);
-      box-shadow: var(--shadow);
-    }
-    .upload-hint {
-      display: block; margin-top: 10px;
-      font-size: 13px; font-weight: 600; color: var(--ink-dim);
-    }
-    #fileInput { display: none; }
 
-    /* ── BUTTONS ── */
-    .btn-secondary {
-      background: #ffffff; border: 2.5px solid var(--border);
-      border-radius: var(--radius-box); color: var(--ink);
-      box-shadow: var(--shadow);
-      font-size: 15px; font-weight: 700; font-family: 'Patrick Hand', cursive;
-      cursor: pointer; transition: all 0.15s;
-      padding: 10px 14px;
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--primary);
+      background: rgba(99, 102, 241, 0.08);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(99, 102, 241, 0.15);
     }
-    .btn-secondary:hover { transform: translate(-2px, -2px); box-shadow: var(--shadow-lg); background: #f7f7f7; }
-    .btn-secondary:active { transform: translate(2px, 2px); box-shadow: var(--shadow-sm); }
+
+    .upload-icon {
+      font-size: 2.2rem;
+      margin-bottom: 0.5rem;
+      filter: drop-shadow(0 4px 10px rgba(99, 102, 241, 0.3));
+    }
+
+    .upload-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .upload-sub {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 0.9rem;
+      max-width: 220px;
+      line-height: 1.35;
+    }
+
+    .upload-browse-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      color: #ffffff;
+      border: none;
+      padding: 0.45rem 1.1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
+      transition: all 0.15s;
+    }
+
+    .upload-browse-btn:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+
+    .upload-hint {
+      display: block;
+      margin-top: 0.65rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .input-quick-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+      margin-top: 0.75rem;
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.55rem 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(51, 65, 85, 0.8);
+      border-color: var(--border-medium);
+      color: #ffffff;
+    }
 
     /* ── SCREENSHOT PREVIEW ── */
-    #previewSection { display: none; padding: 16px 16px 0; }
+    #previewSection {
+      display: none;
+    }
+
     .preview-card {
-      background: #ffffff; border: 2.5px solid var(--border);
-      border-radius: var(--radius-box); box-shadow: var(--shadow);
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
       overflow: hidden;
     }
+
     .preview-topbar {
-      display: flex; align-items: center; gap: 8px;
-      padding: 8px 12px; border-bottom: 2px solid var(--border);
-      background: #f7f7f7;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.55rem 0.85rem;
+      background: rgba(30, 41, 59, 0.5);
+      border-bottom: 1px solid var(--border-subtle);
     }
-    .preview-label { font-family: 'Gaegu', cursive; font-size: 17px; font-weight: 700; color: var(--ink); flex: 1; text-transform: uppercase; }
-    .btn-icon {
-      background: #ffffff; border: 2px solid var(--border); color: var(--ink); font-size: 13px; font-weight: 800;
-      cursor: pointer; padding: 2px 8px; border-radius: 6px; box-shadow: var(--shadow-sm); transition: all 0.15s;
-    }
-    .btn-icon:hover { background: #000; color: #fff; transform: translate(-1px, -1px); }
-    #screenshotPreview {
-      width: 100%; max-height: 260px; object-fit: contain;
-      display: block; background: #fafafa; border-bottom: 2px solid var(--border);
-    }
-    .ocr-bar {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 14px; background: #ffffff;
-    }
-    #ocrProgress { flex: 1; font-size: 14px; font-weight: 600; color: var(--ink); }
-    .btn-ocr {
-      background: #000000; border: 2.5px solid var(--border);
-      border-radius: 10px; color: #ffffff; box-shadow: var(--shadow);
-      font-size: 14px; font-weight: 700; font-family: 'Patrick Hand', cursive;
-      padding: 8px 16px; cursor: pointer; transition: all 0.15s;
-    }
-    .btn-ocr:hover { transform: translate(-2px, -2px); box-shadow: var(--shadow-lg); background: #222; }
-    .btn-ocr:active { transform: translate(2px, 2px); box-shadow: var(--shadow-sm); }
-    .btn-ocr:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: var(--shadow-sm); }
 
-    /* ── OCR PROGRESS BAR ── */
+    .preview-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .btn-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-icon:hover {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.35);
+      color: #f43f5e;
+    }
+
+    #screenshotPreview {
+      width: 100%;
+      max-height: 200px;
+      object-fit: contain;
+      display: block;
+      background: rgba(0, 0, 0, 0.4);
+    }
+
+    .ocr-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 0.85rem;
+      background: rgba(15, 23, 42, 0.75);
+    }
+
+    #ocrProgress {
+      flex: 1;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      line-height: 1.3;
+    }
+
+    .btn-ocr {
+      background: linear-gradient(135deg, #10b981, #059669);
+      border: none;
+      border-radius: var(--radius-sm);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 0.45rem 0.95rem;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-ocr:hover:not(:disabled) {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+
+    .btn-ocr:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     #ocrProgressBar {
-      display: none; height: 6px;
-      background: #e0e0e0; border-bottom: 2px solid var(--border);
+      display: none;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.08);
       overflow: hidden;
     }
+
     #ocrProgressFill {
-      height: 100%; width: 0%;
-      background: #000000;
-      transition: width 0.3s;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #6366f1, #10b981);
+      transition: width 0.3s ease;
     }
 
-    /* ── GRID SECTION ── */
-    #gridSection { display: none; padding: 16px 16px 0; }
-    .grid-header {
-      display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+    /* ── PROCESS LOG / CONSOLE ── */
+    .proc-log {
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      background: rgba(10, 14, 23, 0.75);
     }
-    .grid-header-left { font-family: 'Gaegu', cursive; font-size: 22px; font-weight: 700; color: var(--ink); }
-    .grid-size-row { display: flex; gap: 6px; align-items: center; }
+
+    .proc-log-hdr {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0.85rem;
+      cursor: pointer;
+      user-select: none;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      background: rgba(15, 23, 42, 0.6);
+      transition: background 0.15s;
+    }
+
+    .proc-log-hdr:hover {
+      background: rgba(30, 41, 59, 0.6);
+      color: var(--text-primary);
+    }
+
+    .proc-log-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 6px #10b981;
+    }
+
+    .proc-log-dot.pulse {
+      animation: pulse 1s infinite alternate;
+    }
+
+    .proc-log-cnt {
+      font-size: 0.7rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-secondary);
+      padding: 1px 6px;
+      border-radius: 99px;
+    }
+
+    .proc-log-chev {
+      margin-left: auto;
+      font-size: 0.7rem;
+      transition: transform 0.2s;
+    }
+
+    .proc-log-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      background: #06090e;
+    }
+
+    .proc-log-body.open {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .proc-entries {
+      padding: 0.6rem 0.85rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      line-height: 1.5;
+    }
+
+    .proc-entry {
+      padding: 2px 0;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .proc-entry.step { color: #818cf8; }
+    .proc-entry.ok   { color: #34d399; font-weight: 600; }
+    .proc-entry.warn { color: #fbbf24; }
+    .proc-entry.err  { color: #f87171; font-weight: 600; }
+
+    /* ── HOW TO USE CARD ── */
+    .how-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .how-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .how-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #818cf8;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .how-text {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .how-text strong {
+      color: var(--text-primary);
+    }
+
+    /* ── CENTER COLUMN: PUZZLE BOARD ── */
+    .center-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .board-card {
+      background: var(--bg-surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-xl);
+      padding: 1.5rem;
+      box-shadow: var(--shadow-md), var(--shadow-glow);
+    }
+
+    .board-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .board-title-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .board-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+
+    .grid-size-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 3px;
+    }
+
     .size-btn {
-      background: #ffffff; border: 2px solid var(--border);
-      border-radius: 8px; color: var(--ink); font-size: 13px; font-weight: 700; font-family: 'Patrick Hand', cursive;
-      padding: 3px 9px; cursor: pointer; transition: all 0.15s; box-shadow: var(--shadow-sm);
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: inherit;
+      padding: 0.3rem 0.65rem;
+      cursor: pointer;
+      transition: all 0.15s;
     }
-    .size-btn:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow); }
-    .size-btn.active { background: #000000; color: #ffffff; border-color: #000000; }
+
+    .size-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .size-btn.active {
+      background: rgba(99, 102, 241, 0.9);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+    }
+
+    .board-tip-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 0.4rem 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── GRID CONTAINER & CELLS ── */
+    .grid-container-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      margin: 0 auto;
+    }
 
     .grid-container {
-      position: relative; width: 100%; aspect-ratio: 1/1; max-width: 380px; margin: 0 auto;
-      background: #ffffff; border: 3px solid var(--border); border-radius: var(--radius-box);
-      box-shadow: var(--shadow-lg); padding: 10px;
-    }
-    #gridEl {
-      display: grid; gap: 6px; width: 100%; height: 100%;
-    }
-    .cell {
-      width: 100%; height: 100%;
-      border: 2.5px solid var(--border); border-radius: 8px;
-      background: #ffffff; color: #000000;
-      font-family: 'Space Grotesk', 'Patrick Hand', sans-serif;
-      font-size: clamp(16px, 6vw, 28px); font-weight: 800;
-      text-align: center; text-transform: uppercase;
-      outline: none; appearance: none; -webkit-appearance: none;
-      box-shadow: var(--shadow-sm);
-      caret-color: transparent; transition: all 0.15s;
-      cursor: pointer;
-    }
-    .cell:focus {
-      background: #f0f0f0; border-color: #000000;
-      transform: scale(1.04); box-shadow: var(--shadow);
-    }
-    .cell.blocked {
-      background: repeating-linear-gradient(45deg, #000000, #000000 3px, #ffffff 3px, #ffffff 8px);
-      border-color: #000000; color: transparent; cursor: pointer;
-      box-shadow: none;
-    }
-    .cell.highlight {
-      background: #000000 !important; border-color: #000000 !important; color: #ffffff !important;
-      transform: scale(1.05); box-shadow: var(--shadow);
-    }
-    #pathOverlay {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none; z-index: 10;
+      position: relative;
+      width: 100%;
+      max-width: 460px;
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 12px;
+      box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.4);
     }
 
-    /* ── WEND CONFIG ── */
-    #wendConfig { display: none; margin-top: 14px; }
+    #gridEl {
+      display: grid;
+      width: 100%;
+      height: 100%;
+      gap: 6px;
+    }
+
+    .cell {
+      width: 100%;
+      height: 100%;
+      border: 1.5px solid var(--cell-border);
+      border-radius: var(--radius-sm);
+      background: var(--cell-bg);
+      color: var(--text-primary);
+      font-family: 'Space Grotesk', monospace, sans-serif;
+      font-size: clamp(16px, 4.5vw, 30px);
+      font-weight: 800;
+      text-align: center;
+      text-transform: uppercase;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      caret-color: transparent;
+      transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .cell:hover:not(:disabled) {
+      background: var(--cell-hover);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .cell:focus {
+      background: rgba(99, 102, 241, 0.25);
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35), 0 0 16px rgba(99, 102, 241, 0.3);
+      transform: scale(1.04);
+      z-index: 2;
+    }
+
+    .cell.blocked {
+      background: repeating-linear-gradient(45deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.95) 6px, rgba(30, 41, 59, 0.95) 6px, rgba(30, 41, 59, 0.95) 12px);
+      border-color: rgba(255, 255, 255, 0.05);
+      color: transparent;
+      box-shadow: none;
+    }
+
+    .cell.highlight {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+      border-color: #a5b4fc !important;
+      color: #ffffff !important;
+      transform: scale(1.06);
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.6);
+      z-index: 5;
+    }
+
+    #pathOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* ── WEND EXACT CONFIG ── */
+    #wendConfig {
+      margin-top: 1.25rem;
+    }
+
     .wend-card {
-      background: #ffffff; border: 2.5px solid var(--border);
-      border-radius: var(--radius-box); box-shadow: var(--shadow);
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
       overflow: hidden;
     }
+
     .wend-card-header {
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 14px; cursor: pointer; user-select: none;
-      background: #fafafa;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      user-select: none;
+      background: rgba(30, 41, 59, 0.4);
+      transition: background 0.15s;
     }
-    .wend-card-header:hover { background: #f0f0f0; }
+
+    .wend-card-header:hover {
+      background: rgba(30, 41, 59, 0.7);
+    }
+
     .wend-badge {
-      font-family: 'Gaegu', cursive;
-      font-size: 14px; font-weight: 700; color: #ffffff;
-      background: #000000; border: 1.5px solid #000000;
-      padding: 2px 10px; border-radius: 20px;
-      box-shadow: var(--shadow-sm);
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #818cf8;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 2px 8px;
+      border-radius: 6px;
     }
-    .wend-card-label { flex: 1; font-size: 14px; font-weight: 600; color: var(--ink); }
-    .wend-chevron { font-size: 11px; font-weight: 900; color: var(--ink); transition: transform 0.2s; }
-    .wend-chevron.open { transform: rotate(180deg); }
-    .wend-card-body { display: none; padding: 14px; border-top: 2px solid var(--border); background: #ffffff; }
-    .wend-card-body.open { display: block; }
-    .wend-hint { font-size: 14px; color: var(--ink-dim); margin-bottom: 12px; line-height: 1.4; }
-    .wend-count-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-    .wend-count-row label { font-size: 15px; font-weight: 700; color: var(--ink); }
+
+    .wend-card-label {
+      flex: 1;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .wend-chevron {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      transition: transform 0.2s ease;
+    }
+    .wend-chevron.open {
+      transform: rotate(180deg);
+    }
+
+    .wend-card-body {
+      display: none;
+      padding: 1rem;
+      border-top: 1px solid var(--border-subtle);
+      background: rgba(10, 14, 23, 0.6);
+    }
+    .wend-card-body.open {
+      display: block;
+    }
+
+    .wend-hint {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 0.85rem;
+      line-height: 1.4;
+    }
+
+    .wend-count-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .wend-count-row label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
     .wend-select {
-      background: #ffffff; color: var(--ink); border: 2px solid var(--border);
-      border-radius: 8px; padding: 4px 10px; font-size: 15px; font-family: 'Patrick Hand', cursive;
-      box-shadow: var(--shadow-sm);
+      background: rgba(30, 41, 59, 0.8);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 0.35rem 0.75rem;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
     }
-    .wend-lengths { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
-    .wend-len-group { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-    .wend-len-label { font-size: 12px; font-weight: 700; color: var(--ink-muted); }
+
+    .wend-lengths {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+    }
+
+    .wend-len-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .wend-len-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
     .wend-len-input {
-      width: 48px; height: 42px;
-      background: #ffffff; color: var(--ink); border: 2.5px solid var(--border);
-      border-radius: 10px; font-size: 20px; font-weight: 800; text-align: center;
-      outline: none; font-family: 'Space Grotesk', sans-serif;
-      box-shadow: var(--shadow-sm);
+      width: 44px;
+      height: 38px;
+      background: rgba(30, 41, 59, 0.8);
+      color: var(--text-primary);
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      font-size: 1.1rem;
+      font-weight: 800;
+      text-align: center;
+      outline: none;
+      font-family: 'Space Grotesk', monospace;
+      transition: all 0.15s;
     }
-    .wend-len-input:focus { background: #f0f0f0; box-shadow: var(--shadow); }
+
+    .wend-len-input:focus {
+      border-color: var(--border-focus);
+      background: rgba(99, 102, 241, 0.2);
+    }
 
     /* ── ACTION BUTTONS ── */
     .action-row {
-      display: flex; gap: 10px; padding: 14px 16px;
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+      align-items: center;
     }
+
     .btn-primary {
-      flex: 2; padding: 12px;
-      background: #000000; border: 2.5px solid var(--border);
-      border-radius: var(--radius-box); color: #ffffff;
-      box-shadow: var(--shadow);
-      font-size: 18px; font-weight: 700; font-family: 'Gaegu', cursive;
-      cursor: pointer; transition: all 0.15s;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
+      flex: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      border: none;
+      border-radius: var(--radius-md);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .btn-primary:hover { transform: translate(-2px, -2px); box-shadow: var(--shadow-lg); background: #222; }
-    .btn-primary:active { transform: translate(2px, 2px); box-shadow: var(--shadow-sm); }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-primary:hover:not(:disabled) {
+      filter: brightness(1.1);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
 
     .btn-wend-solve {
-      flex: 2; padding: 12px;
-      background: #ffffff; border: 2.5px solid var(--border);
-      border-radius: var(--radius-box); color: var(--ink);
-      box-shadow: var(--shadow);
-      font-size: 18px; font-weight: 700; font-family: 'Gaegu', cursive;
-      cursor: pointer; transition: all 0.15s;
+      flex: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      border: none;
+      border-radius: var(--radius-md);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(139, 92, 246, 0.35);
+      transition: all 0.2s;
     }
-    .btn-wend-solve:hover { transform: translate(-2px, -2px); box-shadow: var(--shadow-lg); background: #f5f5f5; }
-    .btn-wend-solve:active { transform: translate(2px, 2px); box-shadow: var(--shadow-sm); }
+
+    .btn-wend-solve:hover:not(:disabled) {
+      filter: brightness(1.1);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+    }
+
+    .btn-zip-solve {
+      flex: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      background: linear-gradient(135deg, #06b6d4, #0891b2);
+      border: none;
+      border-radius: var(--radius-md);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(6, 182, 212, 0.35);
+      transition: all 0.2s;
+    }
+
+    .btn-zip-solve:hover:not(:disabled) {
+      filter: brightness(1.1);
+      transform: translateY(-2px);
+    }
 
     /* ── STATUS BAR ── */
     #statusBar {
-      margin: 0 16px 12px;
-      padding: 10px 14px; border-radius: var(--radius-box);
-      font-size: 14px; font-weight: 700; display: none;
-      border: 2px solid var(--border); box-shadow: var(--shadow-sm);
+      display: none;
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: 1px solid transparent;
     }
-    #statusBar.error { background: #ffffff; color: #000000; border: 2.5px solid #000000; display: block; }
+
+    #statusBar.error {
+      display: block;
+      background: rgba(244, 63, 94, 0.12);
+      border-color: rgba(244, 63, 94, 0.3);
+      color: #fb7185;
+    }
+
     #statusBar.loading {
-      background: #f0f0f0; color: #000000; border: 2.5px solid #000000;
-      display: flex; align-items: center; gap: 10px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: rgba(99, 102, 241, 0.12);
+      border-color: rgba(99, 102, 241, 0.3);
+      color: #818cf8;
     }
+
     .spinner {
-      width: 16px; height: 16px; flex-shrink: 0;
-      border: 2.5px solid #cccccc; border-top-color: #000000;
-      border-radius: 50%; animation: spin 0.6s linear infinite;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      border: 2px solid rgba(99, 102, 241, 0.3);
+      border-top-color: #818cf8;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── RESULTS ── */
-    #resultsPanel { display: none; padding: 0 16px 16px; }
-    .results-header {
-      display: flex; align-items: baseline; justify-content: space-between;
-      margin-bottom: 10px;
-    }
-    .results-title { font-family: 'Gaegu', cursive; font-size: 22px; font-weight: 700; color: var(--ink); }
-    .results-count { font-size: 14px; font-weight: 700; color: var(--ink-muted); }
-
-    /* Solution blocks (Wend exact mode) */
-    .solution-block {
-      background: #ffffff; border: 2.5px solid var(--border);
-      border-radius: var(--radius-box); box-shadow: var(--shadow);
-      padding: 12px 14px; margin-bottom: 12px;
-    }
-    .solution-label { font-family: 'Gaegu', cursive; font-size: 16px; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-    .solution-words { display: flex; flex-wrap: wrap; gap: 8px; }
-    .solution-word {
-      padding: 6px 14px; border-radius: 20px;
-      font-size: 15px; font-weight: 800; font-family: 'Space Grotesk', 'Patrick Hand', sans-serif;
-      text-transform: uppercase; letter-spacing: 0.5px;
-      cursor: pointer; transition: all 0.15s;
-      border: 2px solid var(--border); box-shadow: var(--shadow-sm);
-    }
-    .solution-word:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow); }
-    .color-0 { background: #000000; color: #ffffff; }
-    .color-1 { background: #ffffff; color: #000000; }
-    .color-2 { background: #f0f0f0; color: #000000; border-style: dashed; }
-    .color-3 { background: #000000; color: #ffffff; border-style: dotted; }
-    .color-4 { background: #ffffff; color: #000000; border-width: 3px; }
-    .color-5 { background: #e5e5e5; color: #000000; }
-
-    /* Free-solve word chips */
-    .length-group { margin-bottom: 14px; }
-    .length-label { font-family: 'Gaegu', cursive; font-size: 17px; font-weight: 700; color: var(--ink-dim); margin-bottom: 6px; }
-    .words-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
-    .word-chip {
-      background: #ffffff; border: 2px solid var(--border);
-      border-radius: 12px; padding: 5px 12px;
-      font-size: 14px; font-weight: 700; font-family: 'Space Grotesk', sans-serif;
-      color: var(--ink); box-shadow: var(--shadow-sm);
-      cursor: pointer; transition: all 0.15s; text-transform: uppercase;
-    }
-    .word-chip:hover { background: #000000; color: #ffffff; transform: translate(-1px, -1px); box-shadow: var(--shadow); }
-    .word-chip:active { transform: translate(1px, 1px); box-shadow: none; }
-
-    /* ── INSTALL BANNER ── */
-    #installBanner {
-      display: none; margin: 12px 16px;
-      background: #ffffff; border: 2.5px solid var(--border);
-      border-radius: var(--radius-box); box-shadow: var(--shadow);
-      padding: 12px 16px; align-items: center; gap: 12px;
-    }
-    #installBanner.show { display: flex; }
-    .install-text { flex: 1; }
-    .install-title { font-family: 'Gaegu', cursive; font-size: 19px; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
-    .install-sub { font-size: 13px; color: var(--ink-muted); }
-    .btn-install {
-      background: #000000; border: 2px solid var(--border); border-radius: 8px;
-      color: #ffffff; font-size: 14px; font-weight: 700; font-family: 'Patrick Hand', cursive;
-      padding: 6px 14px; cursor: pointer; white-space: nowrap; box-shadow: var(--shadow-sm);
-    }
-    .btn-install:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow); }
-
-    /* ── HOW TO USE ── */
-    .how-card {
-      margin: 12px 16px;
-      background: #ffffff; border: 2.5px solid var(--border);
-      border-radius: var(--radius-box); box-shadow: var(--shadow); padding: 16px;
-      position: relative;
-    }
-    .how-title {
-      font-family: 'Gaegu', cursive; font-size: 21px; font-weight: 700;
-      color: var(--ink); letter-spacing: 0.5px; margin-bottom: 12px;
-      display: flex; align-items: center; gap: 6px;
-    }
-    .how-steps { display: flex; flex-direction: column; gap: 10px; }
-    .how-step { display: flex; align-items: flex-start; gap: 10px; }
-    .how-num {
-      width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
-      background: #000000; border: 2px solid var(--border);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 800; color: #ffffff;
-      font-family: 'Space Grotesk', sans-serif;
-    }
-    .how-text { font-size: 14px; color: var(--ink-dim); line-height: 1.4; padding-top: 2px; }
-    .how-text strong { color: #000000; }
-
-    /* ── TOAST ── */
-    .toast {
-      position: fixed; bottom: max(20px, calc(var(--safe-bot) + 10px)); left: 50%;
-      transform: translateX(-50%) translateY(40px);
-      background: #000000; color: #ffffff;
-      border: 2px solid #000000; box-shadow: var(--shadow);
-      padding: 8px 20px; border-radius: 20px;
-      font-size: 14px; font-weight: 700; font-family: 'Patrick Hand', cursive;
-      opacity: 0; transition: all 0.25s; pointer-events: none; z-index: 999;
-    }
-    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-    /* ── PROCESS LOG ── */
-    .proc-log {
-      margin: 8px 16px 0; background: #ffffff;
-      border: 2.5px solid var(--border); border-radius: var(--radius-box);
-      box-shadow: var(--shadow); overflow: hidden;
-    }
-    .proc-log-hdr {
-      display: flex; align-items: center; gap: 8px; padding: 8px 14px;
-      cursor: pointer; user-select: none; color: var(--ink);
-      font-family: 'Gaegu', cursive; font-size: 18px; font-weight: 700;
-      background: #fafafa; border-bottom: 1.5px solid var(--border);
-    }
-    .proc-log-hdr:hover { background: #f0f0f0; }
-    .proc-log-dot { width: 8px; height: 8px; border-radius: 50%; background: #000000; flex-shrink: 0; }
-    .proc-log-cnt {
-      font-size: 12px; font-weight: 700; font-family: 'Space Grotesk', sans-serif;
-      background: #000000; color: #ffffff; padding: 0 8px; border-radius: 10px;
-    }
-    .proc-log-chev { margin-left: auto; transition: transform 0.2s; font-size: 11px; }
-    .proc-log-body { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; background: #ffffff; }
-    .proc-log-body.open { max-height: 220px; overflow-y: auto; }
-    .proc-entries { padding: 8px 14px 12px; font-family: 'Patrick Hand', monospace; font-size: 14px; }
-    .proc-entry { padding: 3px 0; border-bottom: 1px dashed #dddddd; color: #333333; line-height: 1.4; }
-    .proc-entry:last-child { border: none; }
-    .proc-entry.step { color: #000000; font-weight: 700; }
-    .proc-entry.ok   { color: #000000; font-weight: 700; }
-    .proc-entry.warn { color: #555555; }
-    .proc-entry.err  { color: #000000; font-weight: 800; text-decoration: underline; }
-
-    /* ── SCROLLBAR ── */
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-thumb { background: #000000; border-radius: 2px; }
-
-    /* ── MODE TABS ── */
-    .mode-tabs-wrap { padding: 14px 16px 0; }
-    .mode-tabs {
-      display: flex; gap: 6px; background: #ffffff;
-      border: 2.5px solid var(--border); border-radius: var(--radius-box);
-      box-shadow: var(--shadow); padding: 4px;
-    }
-    .mode-tab {
-      flex: 1; padding: 8px 6px; border: none; border-radius: 8px;
-      background: transparent; color: var(--ink);
-      font-family: 'Gaegu', cursive; font-size: 18px; font-weight: 700;
-      cursor: pointer; transition: all 0.15s; text-align: center;
-      display: flex; align-items: center; justify-content: center; gap: 4px;
-    }
-    .mode-tab:hover { background: #f0f0f0; }
-    .mode-tab.active {
-      background: #000000; color: #ffffff;
-      box-shadow: var(--shadow-sm); transform: translate(-1px, -1px);
-    }
-
     /* ── SUDOKU SECTION ── */
-    #sudokuSection { display: none; padding: 16px 16px 0; }
-    .sudoku-top-row {
-      display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+    #sudokuSection {
+      display: none;
     }
+
     .sudoku-grid {
-      display: grid; gap: 4px; width: 100%; aspect-ratio: 1/1; max-width: 380px; margin: 0 auto 12px;
-      background: #ffffff; border: 3px solid var(--border); border-radius: var(--radius-box);
-      box-shadow: var(--shadow-lg); padding: 8px;
+      display: grid;
+      gap: 4px;
+      width: 100%;
+      max-width: 440px;
+      aspect-ratio: 1 / 1;
+      margin: 0 auto 1.25rem;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 10px;
+      box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.4);
     }
     .sudoku-grid.s6x6 { grid-template-columns: repeat(6, 1fr); }
     .sudoku-grid.s9x9 { grid-template-columns: repeat(9, 1fr); }
-    .s-cell {
-      width: 100%; height: 100%;
-      border: 1.5px solid #000000; border-radius: 6px;
-      background: #ffffff; color: #000000;
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: clamp(14px, 4.5vw, 22px); font-weight: 800;
-      text-align: center; outline: none; box-shadow: var(--shadow-sm);
-      caret-color: transparent; cursor: pointer; transition: all 0.15s;
-    }
-    .s-cell:focus { background: #f0f0f0; transform: scale(1.05); }
-    .s-cell.given { background: #000000; color: #ffffff; font-weight: 900; }
-    .s-cell.solved { background: #f5f5f5; color: #000000; font-weight: 700; border-style: dashed; }
-    .s-cell.bb { border-bottom: 3.5px solid #000000; }
-    .s-cell.br { border-right: 3.5px solid #000000; }
 
-    /* ── ZIP HINT & WALLS ── */
+    .s-cell {
+      width: 100%;
+      height: 100%;
+      border: 1px solid var(--cell-border);
+      border-radius: 6px;
+      background: var(--cell-bg);
+      color: var(--text-primary);
+      font-family: 'Space Grotesk', monospace;
+      font-size: clamp(14px, 3.5vw, 24px);
+      font-weight: 700;
+      text-align: center;
+      outline: none;
+      caret-color: transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .s-cell:focus {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+    }
+
+    .s-cell.given {
+      background: rgba(99, 102, 241, 0.25);
+      border-color: rgba(99, 102, 241, 0.5);
+      color: #ffffff;
+      font-weight: 800;
+    }
+
+    .s-cell.solved {
+      background: rgba(16, 185, 129, 0.18);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      font-weight: 700;
+    }
+
+    .s-cell.bb { border-bottom: 2.5px solid rgba(255, 255, 255, 0.45); }
+    .s-cell.br { border-right: 2.5px solid rgba(255, 255, 255, 0.45); }
+
+    /* ── ZIP HINT ── */
     .zip-hint-card {
-      margin: 12px 0 0; background: #fafafa; border: 2px dashed var(--border);
-      border-radius: var(--radius-box); padding: 10px 14px;
-      font-size: 14px; line-height: 1.4; color: var(--ink-dim);
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px dashed var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 0.85rem 1rem;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      color: var(--text-secondary);
+      margin-top: 1rem;
     }
-    .btn-zip-solve {
-      flex: 2; padding: 12px;
-      background: #000000; border: 2.5px solid var(--border);
-      border-radius: var(--radius-box); color: #ffffff;
-      box-shadow: var(--shadow);
-      font-size: 18px; font-weight: 700; font-family: 'Gaegu', cursive;
-      cursor: pointer; transition: all 0.15s;
+
+    .zip-hint-card code {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1px 4px;
+      border-radius: 4px;
+      color: #a5b4fc;
     }
-    .btn-zip-solve:hover { transform: translate(-2px, -2px); box-shadow: var(--shadow-lg); background: #222; }
-    .btn-zip-solve:active { transform: translate(2px, 2px); box-shadow: var(--shadow-sm); }
+
+    /* ── RIGHT COLUMN: RESULTS & EXPLORER ── */
+    .results-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .results-card {
+      min-height: 280px;
+    }
+
+    .results-empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 1.5rem;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.75rem;
+      opacity: 0.6;
+    }
+
+    .empty-state-text {
+      font-size: 0.85rem;
+      line-height: 1.4;
+      max-width: 240px;
+    }
+
+    /* Solution blocks (Wend exact mode) */
+    .solution-block {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 0.85rem 1rem;
+      margin-bottom: 0.85rem;
+      transition: border-color 0.15s;
+    }
+
+    .solution-block:hover {
+      border-color: var(--border-medium);
+    }
+
+    .solution-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.65rem;
+    }
+
+    .solution-words {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .solution-word {
+      padding: 0.35rem 0.85rem;
+      border-radius: 99px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      font-family: 'Space Grotesk', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      border: 1px solid transparent;
+      user-select: none;
+    }
+
+    .solution-word:hover {
+      transform: translateY(-2px) scale(1.05);
+      filter: brightness(1.2);
+    }
+
+    .color-0 { background: rgba(99, 102, 241, 0.25); color: #a5b4fc; border-color: rgba(99, 102, 241, 0.5); }
+    .color-1 { background: rgba(16, 185, 129, 0.25); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.5); }
+    .color-2 { background: rgba(139, 92, 246, 0.25); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.5); }
+    .color-3 { background: rgba(245, 158, 11, 0.25); color: #fcd34d; border-color: rgba(245, 158, 11, 0.5); }
+    .color-4 { background: rgba(6, 182, 212, 0.25); color: #67e8f9; border-color: rgba(6, 182, 212, 0.5); }
+    .color-5 { background: rgba(244, 63, 94, 0.25); color: #fda4af; border-color: rgba(244, 63, 94, 0.5); }
+
+    /* Free-solve word chips */
+    .length-group {
+      margin-bottom: 1rem;
+    }
+
+    .length-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .words-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+
+    .word-chip {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 0.35rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: 'Space Grotesk', monospace;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-transform: uppercase;
+      user-select: none;
+    }
+
+    .word-chip:hover {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+    }
+
+    .word-chip:active {
+      transform: translateY(0);
+    }
+
+    /* ── INSTALL BANNER ── */
+    #installBanner {
+      display: none;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: var(--radius-md);
+      padding: 0.75rem 1rem;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    #installBanner.show { display: flex; }
+    .install-text { flex: 1; }
+    .install-title { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); }
+    .install-sub { font-size: 0.75rem; color: var(--text-secondary); }
+    .btn-install {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border: none;
+      border-radius: var(--radius-sm);
+      color: #ffffff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 0.4rem 0.85rem;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+      transition: all 0.15s;
+    }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed;
+      bottom: max(24px, calc(var(--safe-bot) + 16px));
+      left: 50%;
+      transform: translateX(-50%) translateY(40px);
+      background: rgba(15, 23, 42, 0.95);
+      color: var(--text-primary);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(99, 102, 241, 0.25);
+      backdrop-filter: blur(12px);
+      padding: 0.6rem 1.4rem;
+      border-radius: 99px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      opacity: 0;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+      z-index: 999;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
   </style>
 </head>
 <body>
-<div class="app">
+<div class="app-wrapper">
 
+  <!-- HEADER -->
   <header>
-    <span class="logo" id="headerLogo">🎯</span>
-    <h1 id="headerTitle">Wend Solver</h1>
-    <span id="statusPill">Loading...</span>
-  </header>
+    <div class="brand-section">
+      <div class="brand-icon" id="headerLogo">🎯</div>
+      <div class="brand-text">
+        <h1 id="headerTitle">Wend Solver</h1>
+        <div class="subtext">Algorithmic Puzzle Engine</div>
+      </div>
+    </div>
 
-  <!-- MODE TABS -->
-  <div class="mode-tabs-wrap">
-    <div class="mode-tabs">
+    <!-- MODE TABS -->
+    <div class="mode-nav">
       <button class="mode-tab active" id="tabWend" onclick="switchMode('wend')">🎯 Wend</button>
       <button class="mode-tab" id="tabSudoku" onclick="switchMode('sudoku')">🔢 Sudoku</button>
       <button class="mode-tab" id="tabZip" onclick="switchMode('zip')">🔀 Zip</button>
     </div>
+
+    <!-- STATUS & ACTIONS -->
+    <div class="header-actions">
+      <span id="statusPill">Loading…</span>
+    </div>
+  </header>
+
+  <!-- PWA INSTALL BANNER -->
+  <div id="installBanner">
+    <div class="install-text">
+      <div class="install-title">Install Wend Solver</div>
+      <div class="install-sub">Instant access, works completely offline</div>
+    </div>
+    <button class="btn-install" id="installBtn">Install App</button>
   </div>
 
-  <main id="mainScroll">
+  <!-- MAIN DASHBOARD -->
+  <div class="dashboard-layout">
 
-    <!-- Install banner (shown when installable) -->
-    <div id="installBanner">
-      <div class="install-text">
-        <div class="install-title">Add to Home Screen</div>
-        <div class="install-sub">Open instantly, works offline</div>
-      </div>
-      <button class="btn-install" id="installBtn">Install</button>
-    </div>
-
-    <!-- UPLOAD ZONE -->
-    <div class="section">
-      <label class="upload-zone" id="uploadZone">
-        <input type="file" id="fileInput" accept="image/*" style="display:none"
-          onchange="handleFileSelect(this)">
-        <div class="upload-icon">📸</div>
-        <div class="upload-title">Drop or browse screenshot</div>
-        <div class="upload-sub">
-          Drag &amp; drop, paste, or click below to browse.
-        </div>
-        <span class="upload-browse-btn">🖼️ Browse Gallery</span>
-        <span class="upload-hint">📤 Mobile: Share Screenshot → Wend Solver</span>
-      </label>
-    </div>
-
-    <!-- PASTE / CAMERA BUTTONS -->
-    <div style="display:flex; gap:8px; padding: 0 16px 16px;">
-      <button class="btn-secondary" id="pasteBtn" style="flex:1">📋 Paste Image</button>
-      <button class="btn-secondary" id="cameraBtn" style="flex:1">📷 Camera</button>
-    </div>
-
-    <!-- SCREENSHOT PREVIEW (shown after image loaded) -->
-    <div id="previewSection">
-      <div class="preview-card fade-in">
-        <div class="preview-topbar">
-          <span class="preview-label">Screenshot</span>
-          <button class="btn-icon" id="clearImgBtn" title="Remove">✕</button>
-        </div>
-        <img id="screenshotPreview" alt="Screenshot preview">
-        <div id="ocrProgressBar"><div id="ocrProgressFill"></div></div>
-        <div class="ocr-bar">
-          <span id="ocrProgress">Ready to scan</span>
-          <button class="btn-ocr" id="runOcrBtn" onclick="runOCR()">🔍 Read Puzzle</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- PROCESS LOG -->
-    <div id="procLogWrap" style="display:none;">
-      <div class="proc-log">
-        <div class="proc-log-hdr" id="procLogHdr" onclick="toggleLog()">
-          <span class="proc-log-dot" id="procLogDot"></span>
-          <span>Process Log</span>
-          <span class="proc-log-cnt" id="procLogCnt">0</span>
-          <span class="proc-log-chev" id="procLogChev">&#9660;</span>
-        </div>
-        <div class="proc-log-body" id="procLogBody">
-          <div class="proc-entries" id="procEntries"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- SHARED GRID SECTION (Wend & Zip) -->
-    <div id="sharedGridSection">
-      <div id="gridSection">
-        <div class="grid-header">
-          <span class="grid-header-left" id="gridTitle">Puzzle Grid</span>
-          <div class="grid-size-row" id="gridSizeRow">
-            <span style="font-size:12px;font-weight:700;color:var(--ink-muted);">Size:</span>
-            <button class="size-btn" data-size="4">4×4</button>
-            <button class="size-btn active" data-size="5">5×5</button>
-            <button class="size-btn" data-size="6">6×6</button>
-            <button class="size-btn" data-size="7">7×7</button>
-            <button class="size-btn" data-size="8">8×8</button>
-          </div>
-        </div>
-        <div class="grid-container">
-          <div id="gridEl"></div>
-          <svg id="pathOverlay"></svg>
+    <!-- LEFT COLUMN: INPUTS & OCR -->
+    <div class="left-column">
+      
+      <!-- UPLOAD ZONE CARD -->
+      <div class="glass-card">
+        <div class="card-header">
+          <span class="card-title">📸 Puzzle Input</span>
+          <span class="card-badge">OCR Scan</span>
         </div>
 
-        <!-- ZIP HINT -->
-        <div class="zip-hint-card" id="zipHintCard" style="display:none;">
-          <strong>🔀 Zip Rules:</strong> Type numbers <code>1, 2, 3...</code> into the cells.<br>
-          • Tap between cell edges to <strong>toggle walls</strong>.<br>
-          • <strong>Double-click</strong> a cell to block it completely.
+        <label class="upload-zone" id="uploadZone">
+          <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFileSelect(this)">
+          <div class="upload-icon">📸</div>
+          <div class="upload-title">Drop screenshot here</div>
+          <div class="upload-sub">Drag &amp; drop, paste from clipboard, or click to browse</div>
+          <span class="upload-browse-btn">🖼️ Browse Image</span>
+          <span class="upload-hint">Mobile: Share Screenshot → Wend Solver</span>
+        </label>
+
+        <div class="input-quick-actions">
+          <button class="btn-secondary" id="pasteBtn">📋 Paste (Ctrl+V)</button>
+          <button class="btn-secondary" id="cameraBtn">📷 Camera</button>
         </div>
 
-        <!-- WEND EXACT CONFIG -->
-        <div id="wendConfig">
-          <div class="wend-card">
-            <div class="wend-card-header" id="wendCardHeader">
-              <span class="wend-badge">Wend</span>
-              <span class="wend-card-label">Set exact word lengths to cover every cell</span>
-              <span class="wend-chevron" id="wendChevron">▼</span>
+        <!-- SCREENSHOT PREVIEW -->
+        <div id="previewSection" style="margin-top: 1rem;">
+          <div class="preview-card">
+            <div class="preview-topbar">
+              <span class="preview-label">Screenshot Preview</span>
+              <button class="btn-icon" id="clearImgBtn" title="Remove">✕</button>
             </div>
-            <div class="wend-card-body" id="wendCardBody">
-              <div class="wend-hint">
-                Enter how many words and their letter counts (shown in the puzzle).
-                Solver covers <strong>every cell</strong> exactly once.
-              </div>
-              <div class="wend-count-row">
-                <label>Number of words:</label>
-                <select class="wend-select" id="wendWordCount">
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                  <option value="3" selected>3</option>
-                  <option value="4">4</option>
-                  <option value="5">5</option>
-                  <option value="6">6</option>
-                </select>
-              </div>
-              <div class="wend-lengths" id="wendLengths"></div>
+            <img id="screenshotPreview" alt="Screenshot preview">
+            <div id="ocrProgressBar"><div id="ocrProgressFill"></div></div>
+            <div class="ocr-bar">
+              <span id="ocrProgress">Ready to scan</span>
+              <button class="btn-ocr" id="runOcrBtn" onclick="runOCR()">🔍 Read Puzzle</button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- ACTION BUTTONS (shown with shared grid) -->
-      <div class="action-row" id="actionRow" style="display:none">
-        <button class="btn-primary" id="freeSolveBtn">⚡ Free Solve</button>
-        <button class="btn-wend-solve" id="wendSolveBtn">🎯 Wend</button>
-        <button class="btn-zip-solve" id="zipSolveBtn" style="display:none;" onclick="solveZip()">🔀 Solve Zip</button>
-        <button class="btn-secondary" id="clearGridBtn">✕</button>
+      <!-- PROCESS LOG CARD -->
+      <div id="procLogWrap" style="display:none;">
+        <div class="proc-log">
+          <div class="proc-log-hdr" id="procLogHdr" onclick="toggleLog()">
+            <span class="proc-log-dot" id="procLogDot"></span>
+            <span>Process Log</span>
+            <span class="proc-log-cnt" id="procLogCnt">0</span>
+            <span class="proc-log-chev" id="procLogChev">&#9660;</span>
+          </div>
+          <div class="proc-log-body" id="procLogBody">
+            <div class="proc-entries" id="procEntries"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HOW TO USE CARD -->
+      <div class="glass-card" id="howCard">
+        <div class="card-header">
+          <span class="card-title" id="howTitle">🎯 How to Solve Wend</span>
+        </div>
+        <div class="how-steps" id="howSteps">
+          <div class="how-step">
+            <div class="how-num">1</div>
+            <div class="how-text">Take a <strong>screenshot</strong> of the puzzle or type letters directly into the grid.</div>
+          </div>
+          <div class="how-step">
+            <div class="how-num">2</div>
+            <div class="how-text">Tap <strong>Read Puzzle</strong> for automatic OCR grid detection.</div>
+          </div>
+          <div class="how-step">
+            <div class="how-num">3</div>
+            <div class="how-text">Use <strong>⚡ Free Solve</strong> for all possible words or <strong>🎯 Wend Solve</strong> for exact length partitions.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CENTER COLUMN: INTERACTIVE PUZZLE BOARD -->
+    <div class="center-column">
+      
+      <!-- MAIN BOARD CARD -->
+      <div class="board-card">
+        
+        <!-- SHARED GRID SECTION (Wend & Zip) -->
+        <div id="sharedGridSection">
+          <div id="gridSection">
+            <div class="board-toolbar">
+              <div class="board-title-group">
+                <span class="board-title" id="gridTitle">Wend Grid</span>
+              </div>
+              <div class="grid-size-row" id="gridSizeRow">
+                <span style="font-size:0.72rem; font-weight:700; color:var(--text-muted); margin-right:4px;">Size:</span>
+                <button class="size-btn" data-size="4">4×4</button>
+                <button class="size-btn active" data-size="5">5×5</button>
+                <button class="size-btn" data-size="6">6×6</button>
+                <button class="size-btn" data-size="7">7×7</button>
+                <button class="size-btn" data-size="8">8×8</button>
+              </div>
+            </div>
+
+            <div class="board-tip-badge">
+              <span>⌨️ <strong>Tip:</strong> Click &amp; type letters · Arrow keys to navigate · Double-click to block cell</span>
+            </div>
+
+            <div class="grid-container-wrapper">
+              <div class="grid-container">
+                <div id="gridEl"></div>
+                <svg id="pathOverlay"></svg>
+              </div>
+            </div>
+
+            <!-- ZIP HINT -->
+            <div class="zip-hint-card" id="zipHintCard" style="display:none;">
+              <strong>🔀 Zip Rules:</strong> Type numbers <code>1, 2, 3...</code> into the cells.<br>
+              • Click on cell edges to <strong>toggle walls</strong>.<br>
+              • <strong>Double-click</strong> a cell to block it completely.
+            </div>
+
+            <!-- WEND EXACT CONFIG -->
+            <div id="wendConfig">
+              <div class="wend-card">
+                <div class="wend-card-header" id="wendCardHeader">
+                  <span class="wend-badge">Exact Partition</span>
+                  <span class="wend-card-label">Configure exact word lengths to cover every grid cell</span>
+                  <span class="wend-chevron" id="wendChevron">▼</span>
+                </div>
+                <div class="wend-card-body" id="wendCardBody">
+                  <div class="wend-hint">
+                    Specify the number of words and their exact letter counts. Wend DFS will find paths that cover <strong>every cell</strong> with no overlaps.
+                  </div>
+                  <div class="wend-count-row">
+                    <label>Number of words:</label>
+                    <select class="wend-select" id="wendWordCount">
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3" selected>3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                      <option value="6">6</option>
+                    </select>
+                  </div>
+                  <div class="wend-lengths" id="wendLengths"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ACTION BUTTONS -->
+          <div class="action-row" id="actionRow">
+            <button class="btn-primary" id="freeSolveBtn">⚡ Free Solve</button>
+            <button class="btn-wend-solve" id="wendSolveBtn">🎯 Wend Solve</button>
+            <button class="btn-zip-solve" id="zipSolveBtn" style="display:none;" onclick="solveZip()">🔀 Solve Zip</button>
+            <button class="btn-secondary" id="clearGridBtn" style="padding: 0.75rem 1.1rem;">✕ Clear</button>
+          </div>
+        </div>
+
+        <!-- SUDOKU SECTION -->
+        <div id="sudokuSection">
+          <div class="board-toolbar">
+            <div class="board-title-group">
+              <span class="board-title">Sudoku Grid</span>
+            </div>
+            <div class="grid-size-row" id="sudokuSizeRow">
+              <button class="size-btn active" id="btnSudoku6" onclick="setSudokuSize(6)">6×6 Mini</button>
+              <button class="size-btn" id="btnSudoku9" onclick="setSudokuSize(9)">9×9 Standard</button>
+            </div>
+          </div>
+          <div class="board-tip-badge">
+            <span>💡 <strong>Sudoku:</strong> Type digits 1-6 or 1-9 into the cells. Dbl-click to clear a cell.</span>
+          </div>
+          <div class="grid-container-wrapper">
+            <div class="sudoku-grid s6x6" id="sudokuGrid"></div>
+          </div>
+          <div class="action-row" style="margin-top: 1.25rem;">
+            <button class="btn-primary" id="sudokuSolveBtn" onclick="solveSudoku()">🔢 Solve Sudoku</button>
+            <button class="btn-secondary" id="sudokuClearBtn" onclick="clearSudoku()" style="padding: 0.75rem 1.1rem;">✕ Clear</button>
+          </div>
+        </div>
+
+        <!-- STATUS BAR -->
+        <div id="statusBar"></div>
+
       </div>
     </div>
 
-    <!-- SUDOKU SECTION -->
-    <div id="sudokuSection">
-      <div class="sudoku-top-row">
-        <span class="grid-header-left">Sudoku Grid</span>
-        <div class="grid-size-row" id="sudokuSizeRow">
-          <button class="size-btn active" id="btnSudoku6" onclick="setSudokuSize(6)">6×6 (Mini)</button>
-          <button class="size-btn" id="btnSudoku9" onclick="setSudokuSize(9)">9×9 (Standard)</button>
+    <!-- RIGHT COLUMN: RESULTS & WORD EXPLORER -->
+    <div class="results-column">
+      <div class="glass-card results-card">
+        <div class="card-header">
+          <span class="card-title">✨ Solutions</span>
+          <span class="card-badge" id="resultsCountBadge">0 found</span>
         </div>
-      </div>
-      <div class="sudoku-grid s6x6" id="sudokuGrid"></div>
-      <div class="zip-hint-card" style="margin-bottom:12px;">
-        💡 <strong>Sudoku:</strong> Type digits 1-6 or 1-9 into the cells. Dbl-click to clear a cell.
-      </div>
-      <div class="action-row" style="padding: 0 0 12px; display:flex;">
-        <button class="btn-primary" id="sudokuSolveBtn" onclick="solveSudoku()">🔢 Solve Sudoku</button>
-        <button class="btn-secondary" id="sudokuClearBtn" onclick="clearSudoku()">✕ Clear</button>
-      </div>
-    </div>
 
-    <!-- STATUS -->
-    <div id="statusBar"></div>
-
-    <!-- RESULTS -->
-    <div id="resultsPanel"></div>
-
-    <!-- HOW TO USE (default state) -->
-    <div class="how-card" id="howCard">
-      <div class="how-title" id="howTitle">🎯 How to solve Wend</div>
-      <div class="how-steps" id="howSteps">
-        <div class="how-step">
-          <div class="how-num">1</div>
-          <div class="how-text">Open LinkedIn and navigate to the <strong>Wend puzzle</strong></div>
-        </div>
-        <div class="how-step">
-          <div class="how-num">2</div>
-          <div class="how-text">Take a <strong>screenshot</strong> on your phone</div>
-        </div>
-        <div class="how-step">
-          <div class="how-num">3</div>
-          <div class="how-text">Share it: tap <strong>Share → Wend Solver</strong> (or paste above)</div>
-        </div>
-        <div class="how-step">
-          <div class="how-num">4</div>
-          <div class="how-text">Tap <strong>Read Puzzle</strong> — OCR reads the grid automatically</div>
-        </div>
-        <div class="how-step">
-          <div class="how-num">5</div>
-          <div class="how-text">Tap <strong>Wend Solve</strong> (set word lengths) or <strong>Free Solve</strong></div>
+        <div id="resultsPanel">
+          <div class="results-empty-state" id="resultsEmptyState">
+            <div class="empty-state-icon">💡</div>
+            <div class="empty-state-text">
+              Run <strong>Free Solve</strong> or <strong>Wend Solve</strong> to view paths &amp; words here. Hover over any word to trace it on the grid!
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-  </main>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -883,8 +1751,8 @@ function switchMode(mode) {
     sudokuSec.style.display = 'none';
     wendConf.style.display = 'block';
     zipHint.style.display = 'none';
-    freeBtn.style.display = 'flex';
-    wendBtn.style.display = 'flex';
+    freeBtn.style.display = 'inline-flex';
+    wendBtn.style.display = 'inline-flex';
     zipBtn.style.display = 'none';
     gridTtl.textContent = 'Wend Grid';
     updateHowTo('wend');
@@ -905,7 +1773,7 @@ function switchMode(mode) {
     zipHint.style.display = 'block';
     freeBtn.style.display = 'none';
     wendBtn.style.display = 'none';
-    zipBtn.style.display = 'flex';
+    zipBtn.style.display = 'inline-flex';
     gridTtl.textContent = 'Zip Grid';
     updateHowTo('zip');
     renderGrid();
@@ -920,27 +1788,27 @@ function updateHowTo(mode) {
   const title = document.getElementById('howTitle');
   const steps = document.getElementById('howSteps');
   if (mode === 'wend') {
-    title.textContent = '🎯 How to solve Wend';
+    title.textContent = '🎯 How to Solve Wend';
     steps.innerHTML = `
       <div class="how-step"><div class="how-num">1</div><div class="how-text">Open LinkedIn and navigate to the <strong>Wend puzzle</strong></div></div>
-      <div class="how-step"><div class="how-num">2</div><div class="how-text">Take a <strong>screenshot</strong> or type letters in the grid</div></div>
+      <div class="how-step"><div class="how-num">2</div><div class="how-text">Take a <strong>screenshot</strong> or type letters into the grid</div></div>
       <div class="how-step"><div class="how-num">3</div><div class="how-text">Tap <strong>Read Puzzle</strong> (OCR) or enter letters manually</div></div>
       <div class="how-step"><div class="how-num">4</div><div class="how-text">Tap <strong>Wend Solve</strong> (set word lengths) or <strong>Free Solve</strong></div></div>
     `;
   } else if (mode === 'sudoku') {
-    title.textContent = '🔢 How to solve Sudoku';
+    title.textContent = '🔢 How to Solve Sudoku';
     steps.innerHTML = `
       <div class="how-step"><div class="how-num">1</div><div class="how-text">Select <strong>6×6 Mini</strong> or <strong>9×9 Standard</strong></div></div>
-      <div class="how-step"><div class="how-num">2</div><div class="how-text">Upload a screenshot or <strong>tap cells</strong> to enter given digits (1-9)</div></div>
-      <div class="how-step"><div class="how-num">3</div><div class="how-text">Tap <strong>Solve Sudoku</strong> to instantly find the complete solution!</div></div>
+      <div class="how-step"><div class="how-num">2</div><div class="how-text">Upload a screenshot or <strong>click cells</strong> to enter given digits (1-9)</div></div>
+      <div class="how-step"><div class="how-num">3</div><div class="how-text">Tap <strong>Solve Sudoku</strong> to instantly calculate the solution!</div></div>
     `;
   } else if (mode === 'zip') {
-    title.textContent = '🔀 How to solve Zip';
+    title.textContent = '🔀 How to Solve Zip';
     steps.innerHTML = `
       <div class="how-step"><div class="how-num">1</div><div class="how-text">Enter numbers (<code>1, 2, 3...</code>) into the grid</div></div>
-      <div class="how-step"><div class="how-num">2</div><div class="how-text">Tap cell edges to <strong>add/remove walls</strong></div></div>
+      <div class="how-step"><div class="how-num">2</div><div class="how-text">Click cell edges to <strong>add or remove walls</strong></div></div>
       <div class="how-step"><div class="how-num">3</div><div class="how-text"><strong>Double-click</strong> any cell to block it completely</div></div>
-      <div class="how-step"><div class="how-num">4</div><div class="how-text">Tap <strong>Solve Zip</strong> to draw the exact path!</div></div>
+      <div class="how-step"><div class="how-num">4</div><div class="how-text">Tap <strong>Solve Zip</strong> to trace the exact continuous path!</div></div>
     `;
   }
 }
@@ -963,6 +1831,8 @@ document.getElementById('installBtn').addEventListener('click', async () => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').then(reg => {
     console.log('[PWA] SW registered', reg.scope);
+  }).catch(err => {
+    console.log('[PWA] SW registration note:', err);
   });
   navigator.serviceWorker.addEventListener('message', e => {
     if (e.data?.type === 'SHARED_IMAGE') {
@@ -1036,11 +1906,11 @@ async function initOCR() {
     } catch (e2) {
       console.warn('Tesseract fallback failed:', e2);
       ocrFailed = true;
-      if (pill) { pill.textContent = 'No OCR'; pill.className = ''; }
+      if (pill) { pill.textContent = 'Manual Mode'; pill.className = 'ready'; }
       if (btn) { btn.textContent = '✏️ Enter Manually'; btn.disabled = false; }
       const prog = document.getElementById('ocrProgress');
       if (prog) prog.textContent = 'OCR unavailable — type into the grid below';
-      log('OCR init failed — manual mode active', 'warn');
+      log('OCR init fallback — manual mode active', 'warn');
       showGridSection();
     }
   }
@@ -1060,21 +1930,15 @@ function showImageFile(file) {
   var blobUrl = URL.createObjectURL(file);
   var img = document.getElementById('screenshotPreview');
   var previewSec = document.getElementById('previewSection');
-  var howCard = document.getElementById('howCard');
 
   img.src = blobUrl;
-  previewSec.style.cssText = 'display:block !important; padding:16px 16px 0;';
-  howCard.style.display = 'none';
+  previewSec.style.display = 'block';
   document.getElementById('ocrProgress').textContent = 'Converting image…';
   document.getElementById('ocrProgressBar').style.display = 'none';
   document.getElementById('ocrProgressFill').style.width = '0%';
 
   log('Image loaded: ' + file.name, 'step');
   showGridSection();
-
-  setTimeout(() => {
-    previewSec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, 100);
 
   const reader = new FileReader();
   reader.onload = e => {
@@ -1163,7 +2027,6 @@ function handlePaste(e) {
 document.getElementById('clearImgBtn').addEventListener('click', () => {
   currentImageDataUrl = null;
   document.getElementById('previewSection').style.display = 'none';
-  document.getElementById('howCard').style.display = 'block';
   document.getElementById('fileInput').value = '';
 });
 
@@ -1419,7 +2282,7 @@ function renderGrid() {
   el.innerHTML = '';
   el.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
   el.style.display = 'grid';
-  el.style.gap = gridSize > 7 ? '3px' : '5px';
+  el.style.gap = gridSize > 7 ? '4px' : '6px';
 
   // Toggle walls on gap click in Zip mode
   el.onclick = (e) => {
@@ -1439,12 +2302,12 @@ function renderGrid() {
         const k = `${r},${c}`;
         const cell = getCell(r, c);
         if (hWalls.has(k)) { hWalls.delete(k); if (cell) cell.style.borderBottom = ''; }
-        else { hWalls.add(k); if (cell) cell.style.borderBottom = '4px solid #000000'; }
+        else { hWalls.add(k); if (cell) cell.style.borderBottom = '3.5px solid #818cf8'; }
       } else if (c < gridSize - 1) {
         const k = `${r},${c}`;
         const cell = getCell(r, c);
         if (vWalls.has(k)) { vWalls.delete(k); if (cell) cell.style.borderRight = ''; }
-        else { vWalls.add(k); if (cell) cell.style.borderRight = '4px solid #000000'; }
+        else { vWalls.add(k); if (cell) cell.style.borderRight = '3.5px solid #818cf8'; }
       }
     }
   };
@@ -1459,8 +2322,8 @@ function renderGrid() {
       input.autocapitalize = 'characters'; input.spellcheck = false;
 
       // Restore walls styling if any
-      if (hWalls.has(`${r},${c}`)) input.style.borderBottom = '4px solid #000000';
-      if (vWalls.has(`${r},${c}`)) input.style.borderRight = '4px solid #000000';
+      if (hWalls.has(`${r},${c}`)) input.style.borderBottom = '3.5px solid #818cf8';
+      if (vWalls.has(`${r},${c}`)) input.style.borderRight = '3.5px solid #818cf8';
 
       input.addEventListener('keydown', e => {
         if (e.key === 'Backspace') { input.value = ''; e.preventDefault(); return; }
@@ -1532,11 +2395,6 @@ function showGridSection() {
     document.getElementById('gridSection').style.display = 'block';
     document.getElementById('actionRow').style.display = 'flex';
   }
-  document.getElementById('howCard').style.display = 'none';
-  setTimeout(() => {
-    const target = currentMode === 'sudoku' ? document.getElementById('sudokuSection') : document.getElementById('gridSection');
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, 100);
 }
 
 // ── SIZE BUTTONS ─────────────────────────────────────────────
@@ -1878,25 +2736,20 @@ document.getElementById('clearGridBtn').addEventListener('click', () => {
   hideResults();
   clearStatus();
   clearColors();
-  document.getElementById('gridSection').style.display = 'none';
-  document.getElementById('actionRow').style.display = 'none';
-  document.getElementById('howCard').style.display = 'block';
 });
 
 // ── RESULTS RENDERING ────────────────────────────────────────
 function showFreeResults(results) {
   const panel = document.getElementById('resultsPanel');
-  panel.style.display = 'block';
+  const countBadge = document.getElementById('resultsCountBadge');
+  if (countBadge) countBadge.textContent = `${results.length} found`;
+  panel.innerHTML = '';
   const groups = {};
   results.forEach(r => { const l = r.word.length; if (!groups[l]) groups[l] = []; groups[l].push(r); });
-  panel.innerHTML = `
-    <div class="results-header">
-      <span class="results-title">Words found</span>
-      <span class="results-count">${results.length} results</span>
-    </div>`;
+  
   Object.keys(groups).map(Number).sort((a, b) => b - a).forEach(len => {
     const g = document.createElement('div'); g.className = 'length-group';
-    g.innerHTML = `<div class="length-label">${len}-letter words</div>`;
+    g.innerHTML = `<div class="length-label"><span>📝</span> <span>${len}-letter words (${groups[len].length})</span></div>`;
     const wrap = document.createElement('div'); wrap.className = 'words-wrap';
     groups[len].forEach(r => {
       const chip = document.createElement('span'); chip.className = 'word-chip';
@@ -1908,17 +2761,14 @@ function showFreeResults(results) {
     });
     g.appendChild(wrap); panel.appendChild(g);
   });
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function showWendResults(solutions) {
   const panel = document.getElementById('resultsPanel');
-  panel.style.display = 'block';
-  panel.innerHTML = `
-    <div class="results-header">
-      <span class="results-title">Solutions</span>
-      <span class="results-count">${solutions.length} found</span>
-    </div>`;
+  const countBadge = document.getElementById('resultsCountBadge');
+  if (countBadge) countBadge.textContent = `${solutions.length} found`;
+  panel.innerHTML = '';
+  
   solutions.forEach((sol, si) => {
     const block = document.createElement('div'); block.className = 'solution-block';
     const label = document.createElement('div'); label.className = 'solution-label';
@@ -1938,12 +2788,20 @@ function showWendResults(solutions) {
     block.appendChild(wordWrap); panel.appendChild(block);
   });
   if (solutions[0]) highlightPath(solutions[0].map(w => w.path));
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function hideResults() {
-  document.getElementById('resultsPanel').style.display = 'none';
-  document.getElementById('resultsPanel').innerHTML = '';
+  const panel = document.getElementById('resultsPanel');
+  const countBadge = document.getElementById('resultsCountBadge');
+  if (countBadge) countBadge.textContent = '0 found';
+  panel.innerHTML = `
+    <div class="results-empty-state" id="resultsEmptyState">
+      <div class="empty-state-icon">💡</div>
+      <div class="empty-state-text">
+        Run <strong>Free Solve</strong> or <strong>Wend Solve</strong> to view paths &amp; words here. Hover over any word to trace it on the grid!
+      </div>
+    </div>
+  `;
 }
 
 // ── PATH DRAWING ─────────────────────────────────────────────
@@ -1956,11 +2814,7 @@ function highlightPath(pathsData) {
     pathCells.forEach(([r, c]) => {
       const el = getCell(r, c);
       if (el && !el.disabled) {
-        el.style.background = '#000000';
-        el.style.borderColor = '#000000';
-        el.style.color = '#ffffff';
-        el.style.transform = 'scale(1.05)';
-        el.style.boxShadow = '3px 3px 0 #555555';
+        el.classList.add('highlight');
       }
     });
     if (pathCells.length < 2) return;
@@ -1974,12 +2828,13 @@ function highlightPath(pathsData) {
 
     const halo = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     halo.setAttribute('d', d); halo.setAttribute('stroke', '#ffffff');
-    halo.setAttribute('stroke-width', '8'); halo.setAttribute('fill', 'none');
+    halo.setAttribute('stroke-width', '7'); halo.setAttribute('fill', 'none');
     halo.setAttribute('stroke-linecap', 'round'); halo.setAttribute('stroke-linejoin', 'round');
+    halo.setAttribute('opacity', '0.9');
     svg.appendChild(halo);
 
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', d); path.setAttribute('stroke', '#000000');
+    path.setAttribute('d', d); path.setAttribute('stroke', '#6366f1');
     path.setAttribute('stroke-width', '3.5'); path.setAttribute('fill', 'none');
     path.setAttribute('stroke-linecap', 'round'); path.setAttribute('stroke-linejoin', 'round');
     svg.appendChild(path);
@@ -1990,22 +2845,22 @@ function highlightPath(pathsData) {
       const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
       const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
       arrow.setAttribute('points', '-5,-5 6,0 -5,5');
-      arrow.setAttribute('fill', '#000000');
-      arrow.setAttribute('stroke', '#ffffff');
-      arrow.setAttribute('stroke-width', '1');
+      arrow.setAttribute('fill', '#ffffff');
+      arrow.setAttribute('stroke', '#6366f1');
+      arrow.setAttribute('stroke-width', '1.5');
       arrow.setAttribute('transform', `translate(${mx},${my}) rotate(${angle})`);
       svg.appendChild(arrow);
     }
     const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     dot.setAttribute('cx', points[0].x); dot.setAttribute('cy', points[0].y);
-    dot.setAttribute('r', '6'); dot.setAttribute('fill', '#000000'); dot.setAttribute('stroke', '#ffffff');
+    dot.setAttribute('r', '6'); dot.setAttribute('fill', '#10b981'); dot.setAttribute('stroke', '#ffffff');
     dot.setAttribute('stroke-width', '2'); svg.appendChild(dot);
 
     const sq = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     const ep = points[points.length - 1];
     sq.setAttribute('x', ep.x - 5); sq.setAttribute('y', ep.y - 5);
     sq.setAttribute('width', '10'); sq.setAttribute('height', '10');
-    sq.setAttribute('fill', '#ffffff'); sq.setAttribute('stroke', '#000000'); sq.setAttribute('stroke-width', '2');
+    sq.setAttribute('fill', '#f43f5e'); sq.setAttribute('stroke', '#ffffff'); sq.setAttribute('stroke-width', '2');
     svg.appendChild(sq);
   });
 }
@@ -2016,11 +2871,7 @@ function clearColors() {
     for (let c = 0; c < gridSize; c++) {
       const el = getCell(r, c);
       if (el && !el.disabled) {
-        el.style.background = '';
-        el.style.borderColor = '';
-        el.style.color = '';
-        el.style.transform = '';
-        el.style.boxShadow = '';
+        el.classList.remove('highlight');
       }
     }
   }
